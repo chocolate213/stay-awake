@@ -3,6 +3,18 @@
 #import "../StayAwakeMenu/main.m"
 #undef main
 
+@interface TestScrollEvent : NSEvent
+@property(nonatomic) CGFloat testDelta;
+@property(nonatomic) BOOL precise;
+@property(nonatomic) NSEventPhase testMomentum;
+@end
+@implementation TestScrollEvent
+- (CGFloat)scrollingDeltaY { return self.testDelta; }
+- (BOOL)hasPreciseScrollingDeltas { return self.precise; }
+- (NSEventPhase)phase { return NSEventPhaseNone; }
+- (NSEventPhase)momentumPhase { return self.testMomentum; }
+@end
+
 @interface TestApp : StayAwakeApp
 @property(nonatomic, strong) NSURL *testRoot;
 @property(nonatomic, strong) NSURL *helperSource;
@@ -38,6 +50,58 @@ int main(int argc, const char *argv[]) {
         app.testRoot = [NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:NSUUID.UUID.UUIDString] isDirectory:YES];
         app.helperSource = [NSURL fileURLWithPath:@(argv[1])];
         @try {
+            NSCalendar *calendar = [[NSCalendar alloc] initWithCalendarIdentifier:NSCalendarIdentifierGregorian];
+            calendar.timeZone = [NSTimeZone timeZoneForSecondsFromGMT:0];
+            NSDateComponents *base = [NSDateComponents new];
+            base.year = 2026; base.month = 9; base.day = 18; base.hour = 23;
+            NSDate *now = [calendar dateFromComponents:base];
+            NSDate *fourAM = [now dateByAddingTimeInterval:-19 * 3600];
+            Check([[app nextDeadlineForTime:fourAM afterDate:now calendar:calendar] timeIntervalSinceDate:now] == 5 * 3600, @"23:00 to 04:00 means tomorrow");
+            Check([[app nextDeadlineForTime:now afterDate:now calendar:calendar] timeIntervalSinceDate:now] == 24 * 3600, @"current minute means tomorrow");
+            NSDate *earlier = [now dateByAddingTimeInterval:-3600];
+            Check([[app nextDeadlineForTime:now afterDate:earlier calendar:calendar] timeIntervalSinceDate:earlier] == 3600, @"future clock time means today");
+            NSView *durationView = [NSView new];
+            NSTextField *hoursField = [app addDurationFieldToView:durationView x:0 tag:1 label:@"Hours" maximum:168 value:1];
+            NSTextField *minutesField = [app addDurationFieldToView:durationView x:160 tag:2 label:@"Minutes" maximum:59 value:30];
+            for (NSString *invalid in @[@"-1", @"1.5", @"a", @"60", @"999", @" 2"]) {
+                Check(![minutesField.formatter isPartialStringValid:invalid newEditingString:NULL errorDescription:NULL], @"reject invalid typing and paste before accepting edits");
+            }
+            Check([minutesField.formatter isPartialStringValid:@"" newEditingString:NULL errorDescription:NULL], @"allow deletion while editing");
+            Check(![hoursField.formatter isPartialStringValid:@"168" newEditingString:NULL errorDescription:NULL], @"reject combined duration over seven days during editing");
+            minutesField.stringValue = @"0";
+            Check([hoursField.formatter isPartialStringValid:@"168" newEditingString:NULL errorDescription:NULL], @"allow exact seven day boundary");
+            Check(![hoursField.formatter isPartialStringValid:@"0" newEditingString:NULL errorDescription:NULL], @"reject explicit zero total");
+            hoursField.stringValue = @"";
+            [app controlTextDidEndEditing:[NSNotification notificationWithName:NSControlTextDidEndEditingNotification object:hoursField]];
+            Check(hoursField.integerValue == 1, @"normalize empty field to a valid duration on focus loss");
+            TestScrollEvent *scroll = [TestScrollEvent new];
+            scroll.testDelta = -1;
+            [(ScrollableDurationField *)hoursField scrollWheel:scroll];
+            Check(hoursField.integerValue == 1, @"scroll cannot reduce total duration to zero");
+            minutesField.stringValue = @"59";
+            scroll.testDelta = 1;
+            [(ScrollableDurationField *)minutesField scrollWheel:scroll];
+            Check(minutesField.integerValue == 59, @"scroll respects minute upper bound");
+            hoursField.stringValue = @"167";
+            [(ScrollableDurationField *)hoursField scrollWheel:scroll];
+            Check(hoursField.integerValue == 167, @"scroll respects combined seven day limit");
+            minutesField.stringValue = @"0";
+            [(ScrollableDurationField *)hoursField scrollWheel:scroll];
+            Check(hoursField.integerValue == 168, @"scroll reaches exact seven day limit");
+            TimeScrollAccumulator *accumulator = [TimeScrollAccumulator new];
+            scroll.precise = YES; scroll.testDelta = 6;
+            Check([accumulator stepsForEvent:scroll] == 0, @"small trackpad movement accumulates");
+            Check([accumulator stepsForEvent:scroll] == 1, @"trackpad threshold yields one step");
+            scroll.testMomentum = NSEventPhaseChanged; scroll.testDelta = 120;
+            Check([accumulator stepsForEvent:scroll] == 0, @"ignore inertial scrolling");
+
+            Check([app secondsForDurationHours:@"1" minutes:@"30"] == 5400, @"duration hours plus minutes");
+            Check([app secondsForDurationHours:@"0" minutes:@"1"] == 60, @"duration minimum");
+            Check([app secondsForDurationHours:@"168" minutes:@"0"] == 604800, @"duration maximum");
+            Check([app secondsForDurationHours:@"168" minutes:@"1"] < 0, @"duration over maximum rejected");
+            Check([app secondsForDurationHours:@"0" minutes:@"0"] < 0, @"zero duration rejected");
+            Check([app secondsForDurationHours:@"1" minutes:@"60"] < 0, @"invalid minute component rejected");
+            Check([app secondsForDurationHours:@"1.5" minutes:@"0"] < 0, @"fractional hours rejected");
             [app configureStatusItem];
             Check(app.toggleMenuItem.state == NSControlStateValueOff, @"inactive toggle action has no checkmark");
             Check(app.durationMenuItem.submenu.numberOfItems == 11, @"preset and custom actions present");

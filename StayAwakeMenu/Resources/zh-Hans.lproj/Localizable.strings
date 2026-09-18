@@ -45,3 +45,13 @@
 "duration.hours" = "%ld 小时";
 
 "duration.hour" = "%ld 小时";
+
+"until.title" = "保持唤醒至…";
+"until.help" = "选择结束时间。已经过去的时间将设为明天。";
+"until.today" = "今天";
+"until.tomorrow" = "明天";
+"until.preview" = "%@ %@ · 约剩余 %@";
+"duration.hours.label" = "小时";
+"duration.minutes.label" = "分钟";
+"duration.picker.help" = "选择小时和分钟，总时长为 1 分钟至 7 天。";
+"duration.picker.invalid" = "请输入整数小时（0–168）和分钟（0–59），总时长须为 1 分钟至 7 天。";

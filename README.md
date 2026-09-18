@@ -9,7 +9,8 @@ Choose a duration, see the time remaining in the menu bar, and extend the sessio
 ## Features
 
 - Keep your Mac and display awake for **15 or 30 minutes, or 1, 2, 3, 4, 5, or 8 hours**, or indefinitely.
-- Set a **custom duration** from 1 to 10,080 minutes (7 days).
+- Set a **custom duration** using native hours and minutes controls, from 1 minute to 7 days.
+- Choose **Keep Awake Until…** to select a clock time, with a live Today/Tomorrow preview.
 - See **remaining time in the menu bar** and the expected end time in the menu.
 - **Extend by 30 minutes** without resetting the remaining time, or stop at any time.
 - Restore normal sleep behavior silently when the timer expires; no expiry notification.
@@ -56,14 +57,15 @@ Click the moon icon to open the menu:
 | Action / state | Behavior |
 | --- | --- |
 | Turn Stay Awake On | Start an indefinite session. |
-| Keep Awake For | Choose a preset or a custom number of minutes. A new duration replaces the current session, starting now. |
+| Keep Awake Until… | Stay awake until the next occurrence of the selected time. Past times, including the current minute, mean tomorrow. |
+| Keep Awake For | Choose a preset or a custom duration in hours and minutes. A new duration replaces the current session, starting now. |
 | Extend by 30 Minutes | Add 30 minutes to the remaining time. Available only during a timed session. |
 | Turn Stay Awake Off | Stop the current session immediately. |
 | Quit | Stop the current session and exit the app. |
 
 The active moon icon indicates that Stay Awake is on; the sleeping moon means it is off. Timed sessions also show a compact countdown such as `42m`, `1h 20m`, or `<1m`. Indefinite sessions show `On` beside the icon until stopped; inactive sessions show `Off`. The countdown refreshes every few seconds, including while the menu is open.
 
-Custom durations accept whole minutes from 1 to 10,080. Cancel leaves the current session unchanged. After sleep or wake, the app reconciles an expired deadline instead of starting the timer again.
+Custom durations accept whole hours (0–168) and minutes (0–59), totaling 1 minute to 7 days. Invalid characters and out-of-range values are rejected as you type. Scroll over an hours or minutes field to adjust a custom duration; in Keep Awake Until, select the time segment first, then scroll. Cancel leaves the current session unchanged. After sleep or wake, the app reconciles an expired deadline instead of starting the timer again.
 
 ## Install From Source
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0
+
+- Add Keep Awake Until with a native time picker and a Today/Tomorrow preview.
+- Replace the custom minutes field with native hours/minutes inputs and steppers.
+- Use matching dialog sizes and large, easy-to-read time digits.
+- Reject invalid custom duration input immediately, including values exceeding the seven-day limit.
+- Adjust time values with the mouse wheel or trackpad; filter inertial scrolling to avoid unintended changes.
+
 ## 1.0.4
 
 - Remove the checkmark from the On/Off action to avoid confusing the next action with the current state.

@@ -17,7 +17,93 @@ static NSString *LocalizedString(NSString *key) {
     return [PreferredLocalizationBundle() localizedStringForKey:key value:key table:nil];
 }
 
-@interface StayAwakeApp : NSObject <NSApplicationDelegate, NSMenuDelegate>
+// Accumulate trackpad movement; one wheel notch changes one unit.
+@interface TimeScrollAccumulator : NSObject
+@property(nonatomic) CGFloat remainder;
+- (NSInteger)stepsForEvent:(NSEvent *)event;
+@end
+@implementation TimeScrollAccumulator
+- (NSInteger)stepsForEvent:(NSEvent *)event {
+    if (event.momentumPhase != NSEventPhaseNone) return 0;
+    if (event.phase == NSEventPhaseBegan) self.remainder = 0;
+    CGFloat delta = event.scrollingDeltaY;
+    if (!event.hasPreciseScrollingDeltas) return delta > 0 ? 1 : delta < 0 ? -1 : 0;
+    if (delta * self.remainder < 0) self.remainder = 0;
+    self.remainder += delta;
+    NSInteger steps = (NSInteger)(self.remainder / 12.0);
+    self.remainder -= steps * 12.0;
+    return steps;
+}
+@end
+
+@interface ScrollableTimePicker : NSDatePicker
+@property(nonatomic, strong) TimeScrollAccumulator *scrollAccumulator;
+@end
+@implementation ScrollableTimePicker
+- (void)scrollWheel:(NSEvent *)event {
+    if (!self.scrollAccumulator) self.scrollAccumulator = [TimeScrollAccumulator new];
+    NSInteger steps = [self.scrollAccumulator stepsForEvent:event];
+    // Let AppKit increment the selected time segment, including locale-specific AM/PM.
+    [self.window makeFirstResponder:self];
+    for (NSInteger index = 0; index < labs(steps); index++) {
+        NSString *arrow = [NSString stringWithFormat:@"%C", (unichar)(steps > 0 ? NSUpArrowFunctionKey : NSDownArrowFunctionKey)];
+        NSEvent *key = [NSEvent keyEventWithType:NSEventTypeKeyDown location:NSZeroPoint
+            modifierFlags:0 timestamp:event.timestamp windowNumber:self.window.windowNumber
+            context:nil characters:arrow charactersIgnoringModifiers:arrow isARepeat:NO keyCode:steps > 0 ? 126 : 125];
+        [self keyDown:key];
+    }
+    [self sendAction:self.action to:self.target];
+}
+@end
+
+@interface ScrollableDurationField : NSTextField
+@property(nonatomic, strong) TimeScrollAccumulator *scrollAccumulator;
+@end
+@implementation ScrollableDurationField
+- (void)scrollWheel:(NSEvent *)event {
+    if (!self.scrollAccumulator) self.scrollAccumulator = [TimeScrollAccumulator new];
+    NSInteger steps = [self.scrollAccumulator stepsForEvent:event];
+    if (!steps) return;
+    // Commit a currently edited field before applying changes to its value.
+    [self.window makeFirstResponder:nil];
+    for (NSInteger index = 0; index < labs(steps); index++) {
+        NSString *candidate = [NSString stringWithFormat:@"%ld", self.integerValue + (steps > 0 ? 1 : -1)];
+        if (![self.formatter isPartialStringValid:candidate newEditingString:NULL errorDescription:NULL]) break;
+        self.stringValue = candidate;
+    }
+    NSStepper *stepper = [self.superview viewWithTag:self.tag + 10];
+    stepper.integerValue = self.integerValue;
+}
+@end
+
+// Validate edits before AppKit accepts typing or pasted text.
+@interface DurationFormatter : NSFormatter
+@property(nonatomic, weak) NSTextField *field;
+@end
+
+@implementation DurationFormatter
+- (NSString *)stringForObjectValue:(id)object { return [object description] ?: @""; }
+- (BOOL)getObjectValue:(out id *)object forString:(NSString *)string errorDescription:(out NSString **)error {
+    (void)error;
+    if (object) *object = string;
+    return YES;
+}
+- (BOOL)isPartialStringValid:(NSString *)string newEditingString:(NSString **)replacement errorDescription:(NSString **)error {
+    (void)replacement;
+    (void)error;
+    // An empty field is allowed while replacing its contents.
+    if (string.length == 0) return YES;
+    if (string.length > (self.field.tag == 1 ? 3 : 2) ||
+        [string rangeOfCharacterFromSet:[NSCharacterSet characterSetWithCharactersInString:@"0123456789"].invertedSet].location != NSNotFound) return NO;
+    NSTextField *other = [self.field.superview viewWithTag:self.field.tag == 1 ? 2 : 1];
+    NSInteger hours = self.field.tag == 1 ? string.integerValue : other.integerValue;
+    NSInteger minutes = self.field.tag == 2 ? string.integerValue : other.integerValue;
+    return hours <= 168 && minutes <= 59 && hours * 60 + minutes <= 10080 &&
+        (hours + minutes > 0 || other.stringValue.length == 0);
+}
+@end
+
+@interface StayAwakeApp : NSObject <NSApplicationDelegate, NSMenuDelegate, NSTextFieldDelegate>
 @property(nonatomic, strong) NSStatusItem *statusItem;
 @property(nonatomic, strong) NSMenuItem *statusMenuItem;
 @property(nonatomic, strong) NSMenuItem *toggleMenuItem;
@@ -29,6 +115,8 @@ static NSString *LocalizedString(NSString *key) {
 @property(nonatomic, strong) NSMenuItem *aboutMenuItem;
 @property(nonatomic, strong) NSMenuItem *quitMenuItem;
 @property(nonatomic, strong) NSTimer *refreshTimer;
+@property(nonatomic, strong) NSDatePicker *untilPicker;
+@property(nonatomic, strong) NSTextField *untilPreview;
 @end
 
 @implementation StayAwakeApp
@@ -165,6 +253,9 @@ static NSString *LocalizedString(NSString *key) {
     [durations addItem:custom];
     self.durationMenuItem.submenu = durations;
     [menu addItem:self.durationMenuItem];
+    NSMenuItem *untilItem = [[NSMenuItem alloc] initWithTitle:LocalizedString(@"until.title") action:@selector(startUntil:) keyEquivalent:@""];
+    untilItem.target = self;
+    [menu addItem:untilItem];
     self.extendMenuItem = [[NSMenuItem alloc] initWithTitle:LocalizedString(@"menu.extend") action:@selector(extendSession:) keyEquivalent:@""];
     self.extendMenuItem.target = self;
     [menu addItem:self.extendMenuItem];
@@ -350,26 +441,163 @@ static NSString *LocalizedString(NSString *key) {
     return minutes >= 1 && minutes <= 10080 ? minutes * 60 : -1;
 }
 
-- (void)startCustom:(id)sender {
+- (NSDate *)nextDeadlineForTime:(NSDate *)time afterDate:(NSDate *)now calendar:(NSCalendar *)calendar {
+    NSDateComponents *parts = [calendar components:NSCalendarUnitHour | NSCalendarUnitMinute fromDate:time];
+    parts.second = 0;
+    return [calendar nextDateAfterDate:now matchingComponents:parts options:NSCalendarMatchNextTime | NSCalendarMatchFirst];
+}
+
+- (void)updateUntilPreview:(id)sender {
     (void)sender;
-    NSAlert *alert = [[NSAlert alloc] init];
-    alert.messageText = LocalizedString(@"duration.custom");
-    alert.informativeText = LocalizedString(@"duration.custom.help");
+    NSDate *now = NSDate.date;
+    NSDate *deadline = [self nextDeadlineForTime:self.untilPicker.dateValue afterDate:now calendar:NSCalendar.currentCalendar];
+    NSString *day = LocalizedString([NSCalendar.currentCalendar isDate:deadline inSameDayAsDate:now] ? @"until.today" : @"until.tomorrow");
+    NSString *time = [NSDateFormatter localizedStringFromDate:deadline dateStyle:NSDateFormatterNoStyle timeStyle:NSDateFormatterShortStyle];
+    self.untilPreview.stringValue = [NSString stringWithFormat:LocalizedString(@"until.preview"), day, time, [self countdownForSeconds:[deadline timeIntervalSinceDate:now]]];
+}
+
+- (NSView *)timeSelectionViewWithHelp:(NSString *)help {
+    NSView *view = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 340, 194)];
+    NSTextField *label = [NSTextField wrappingLabelWithString:help];
+    label.frame = NSMakeRect(0, 150, 340, 44);
+    [view addSubview:label];
+    return view;
+}
+
+- (void)startUntil:(id)sender {
+    (void)sender;
+    NSAlert *alert = [NSAlert new];
+    alert.messageText = LocalizedString(@"until.title");
+
     [alert addButtonWithTitle:LocalizedString(@"duration.start")];
     [alert addButtonWithTitle:LocalizedString(@"duration.cancel")];
-    NSTextField *input = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 260, 24)];
-    input.stringValue = @"90";
-    input.accessibilityLabel = LocalizedString(@"duration.input");
-    alert.accessoryView = input;
+    NSView *view = [self timeSelectionViewWithHelp:LocalizedString(@"until.help")];
+    self.untilPicker = [[ScrollableTimePicker alloc] initWithFrame:NSMakeRect(0, 52, 180, 28)];
+    self.untilPicker.datePickerStyle = NSDatePickerStyleTextField;
+    self.untilPicker.font = [NSFont monospacedDigitSystemFontOfSize:44 weight:NSFontWeightLight];
+    self.untilPicker.bezeled = NO;
+    self.untilPicker.bordered = NO;
+    self.untilPicker.drawsBackground = NO;
+    self.untilPicker.datePickerElements = NSDatePickerElementFlagHourMinute;
+    self.untilPicker.dateValue = [NSDate dateWithTimeIntervalSinceNow:3600];
+    [self.untilPicker sizeToFit];
+    [self.untilPicker setFrameOrigin:NSMakePoint((340 - self.untilPicker.frame.size.width) / 2, 62)];
+    self.untilPicker.accessibilityLabel = LocalizedString(@"until.title");
+    self.untilPicker.target = self;
+    self.untilPicker.action = @selector(updateUntilPreview:);
+    [view addSubview:self.untilPicker];
+    self.untilPreview = [NSTextField wrappingLabelWithString:@""];
+    self.untilPreview.frame = NSMakeRect(0, 0, 340, 44);
+    self.untilPreview.textColor = NSColor.secondaryLabelColor;
+    self.untilPreview.alignment = NSTextAlignmentCenter;
+    [view addSubview:self.untilPreview];
+    alert.accessoryView = view;
+    [self updateUntilPreview:nil];
+    NSTimer *timer = [NSTimer timerWithTimeInterval:1 target:self selector:@selector(updateUntilPreview:) userInfo:nil repeats:YES];
+    [NSRunLoop.mainRunLoop addTimer:timer forMode:NSModalPanelRunLoopMode];
     [NSApp activateIgnoringOtherApps:YES];
-    alert.window.initialFirstResponder = input;
+    alert.window.initialFirstResponder = self.untilPicker;
+    NSModalResponse response = [alert runModal];
+    [alert.window makeFirstResponder:nil];
+    [timer invalidate];
+    if (response == NSAlertFirstButtonReturn) {
+        NSDate *now = NSDate.date;
+        NSDate *deadline = [self nextDeadlineForTime:self.untilPicker.dateValue afterDate:now calendar:NSCalendar.currentCalendar];
+        [self replaceSessionWithSeconds:[deadline timeIntervalSinceDate:now]];
+    }
+    self.untilPicker = nil;
+    self.untilPreview = nil;
+}
+
+- (void)durationStepperChanged:(NSStepper *)sender {
+    NSTextField *field = [sender.superview viewWithTag:sender.tag - 10];
+    NSString *candidate = [NSString stringWithFormat:@"%ld", sender.integerValue];
+    if ([field.formatter isPartialStringValid:candidate newEditingString:NULL errorDescription:NULL]) {
+        field.stringValue = candidate;
+    } else {
+        sender.integerValue = field.integerValue;
+    }
+}
+
+- (void)controlTextDidChange:(NSNotification *)notification {
+    NSTextField *field = notification.object;
+    NSStepper *stepper = [field.superview viewWithTag:field.tag + 10];
+    if ([stepper isKindOfClass:NSStepper.class]) stepper.integerValue = field.integerValue;
+}
+
+- (void)controlTextDidEndEditing:(NSNotification *)notification {
+    NSTextField *field = notification.object;
+    if (field.stringValue.length == 0) {
+        NSTextField *other = [field.superview viewWithTag:field.tag == 1 ? 2 : 1];
+        field.integerValue = other.integerValue == 0 ? 1 : 0;
+        [self controlTextDidChange:notification];
+    }
+}
+
+- (NSTextField *)addDurationFieldToView:(NSView *)view x:(CGFloat)x tag:(NSInteger)tag label:(NSString *)label maximum:(NSInteger)maximum value:(NSInteger)value {
+    NSTextField *caption = [NSTextField labelWithString:label];
+    caption.frame = NSMakeRect(x, 118, 110, 20);
+    caption.alignment = NSTextAlignmentCenter;
+    caption.textColor = NSColor.secondaryLabelColor;
+    [view addSubview:caption];
+    NSTextField *field = [[ScrollableDurationField alloc] initWithFrame:NSMakeRect(x, 62, 110, 58)];
+    field.font = [NSFont monospacedDigitSystemFontOfSize:44 weight:NSFontWeightLight];
+    field.alignment = NSTextAlignmentCenter;
+    field.bezeled = NO;
+    field.bordered = NO;
+    field.drawsBackground = NO;
+    field.tag = tag;
+    field.integerValue = value;
+    field.accessibilityLabel = label;
+    field.delegate = self;
+    DurationFormatter *formatter = [DurationFormatter new];
+    formatter.field = field;
+    field.formatter = formatter;
+    [view addSubview:field];
+    NSStepper *stepper = [[NSStepper alloc] initWithFrame:NSMakeRect(x + 112, 79, 20, 27)];
+    stepper.minValue = 0;
+    stepper.maxValue = maximum;
+    stepper.increment = 1;
+    stepper.valueWraps = NO;
+    stepper.integerValue = value;
+    stepper.tag = tag + 10;
+    stepper.target = self;
+    stepper.action = @selector(durationStepperChanged:);
+    stepper.accessibilityLabel = label;
+    [view addSubview:stepper];
+    return field;
+}
+
+- (NSTimeInterval)secondsForDurationHours:(NSString *)hours minutes:(NSString *)minutes {
+    NSCharacterSet *invalid = [NSCharacterSet characterSetWithCharactersInString:@"0123456789"].invertedSet;
+    for (NSString *value in @[hours, minutes]) {
+        if (value.length == 0 || value.length > 3 || [value rangeOfCharacterFromSet:invalid].location != NSNotFound) return -1;
+    }
+    if (hours.integerValue > 168 || minutes.integerValue > 59) return -1;
+    return [self secondsForCustomMinutes:[NSString stringWithFormat:@"%ld", hours.integerValue * 60 + minutes.integerValue]];
+}
+
+- (void)startCustom:(id)sender {
+    (void)sender;
+    NSAlert *alert = [NSAlert new];
+    alert.messageText = LocalizedString(@"duration.custom");
+
+    [alert addButtonWithTitle:LocalizedString(@"duration.start")];
+    [alert addButtonWithTitle:LocalizedString(@"duration.cancel")];
+    NSView *view = [self timeSelectionViewWithHelp:LocalizedString(@"duration.picker.help")];
+    NSTextField *hours = [self addDurationFieldToView:view x:20 tag:1 label:LocalizedString(@"duration.hours.label") maximum:168 value:1];
+    NSTextField *minutes = [self addDurationFieldToView:view x:190 tag:2 label:LocalizedString(@"duration.minutes.label") maximum:59 value:30];
+    alert.accessoryView = view;
+    [NSApp activateIgnoringOtherApps:YES];
+    alert.window.initialFirstResponder = hours;
     while ([alert runModal] == NSAlertFirstButtonReturn) {
-        NSTimeInterval seconds = [self secondsForCustomMinutes:input.stringValue];
+        [alert.window makeFirstResponder:nil];
+        NSTimeInterval seconds = [self secondsForDurationHours:hours.stringValue minutes:minutes.stringValue];
         if (seconds > 0) {
             [self replaceSessionWithSeconds:seconds];
             return;
         }
-        alert.informativeText = LocalizedString(@"duration.custom.invalid");
+        alert.informativeText = LocalizedString(@"duration.picker.invalid");
     }
 }
 

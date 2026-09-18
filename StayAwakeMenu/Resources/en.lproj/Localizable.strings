@@ -45,3 +45,13 @@
 "duration.hours" = "%ld hours";
 
 "duration.hour" = "%ld hour";
+
+"until.title" = "Keep Awake Until…";
+"until.help" = "Choose a time. A time that has already passed means tomorrow.";
+"until.today" = "Today";
+"until.tomorrow" = "Tomorrow";
+"until.preview" = "%@ %@ · About %@ remaining";
+"duration.hours.label" = "Hours";
+"duration.minutes.label" = "Minutes";
+"duration.picker.help" = "Choose hours and minutes, from 1 minute to 7 days.";
+"duration.picker.invalid" = "Enter whole hours (0–168) and minutes (0–59), totaling 1 minute to 7 days.";
