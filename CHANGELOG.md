@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.4
+
+- Add 5-hour and 8-hour keep-awake presets alongside 15min, 30min, 1h, and 2h.
+- Show compact English duration labels and localized hour labels; retain indefinite and custom sessions.
+
 ## 1.0.3
 
 - Redesign the application icon with a white background, blue-violet moon, and cyan spark using Apple Icon Composer. Include the editable layered source and a static render for the existing build pipeline.

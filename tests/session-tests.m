@@ -39,7 +39,17 @@ int main(int argc, const char *argv[]) {
         app.helperSource = [NSURL fileURLWithPath:@(argv[1])];
         @try {
             [app configureStatusItem];
-            Check(app.durationMenuItem.submenu.numberOfItems == 7, @"preset and custom actions present");
+            Check(app.durationMenuItem.submenu.numberOfItems == 9, @"preset and custom actions present");
+            for (NSUInteger index = 4; index <= 5; index++) {
+                NSMenuItem *preset = [app.durationMenuItem.submenu itemAtIndex:index];
+                NSInteger hours = index == 4 ? 5 : 8;
+                Check(preset.tag == hours * 3600, @"long presets use seconds");
+                [app startPreset:preset];
+                NSTimeInterval remaining = [app activeDeadline].timeIntervalSinceNow;
+                Check(remaining > hours * 3600 - 5 && remaining <= hours * 3600, @"long preset starts correct deadline");
+                [app stopStayAwakeNotifying:NO];
+            }
+            [app refreshStatus];
             Check(!app.extendMenuItem.enabled && [app.statusItem.button.title isEqualToString:[@" " stringByAppendingString:LocalizedString(@"countdown.off")]], @"off state shows Off and disables extension");
             Check([app secondsForCustomMinutes:@"90"] == 5400, @"custom minutes");
             Check([app secondsForCustomMinutes:@" 1 "] == 60, @"custom lower bound");

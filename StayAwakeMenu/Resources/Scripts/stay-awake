@@ -2,11 +2,11 @@
 set -euo pipefail
 
 readonly PROGRAM_NAME="stay-awake"
-readonly VERSION="1.0.3"
+readonly VERSION="1.0.4"
 
 usage() {
   cat <<'USAGE'
-stay-awake 1.0.3
+stay-awake 1.0.4
 
 Usage:
   stay-awake [OPTIONS] [DURATION]

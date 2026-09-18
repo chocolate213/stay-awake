@@ -149,9 +149,10 @@ static NSString *LocalizedString(NSString *key) {
     [menu addItem:self.toggleMenuItem];
     self.durationMenuItem = [[NSMenuItem alloc] initWithTitle:LocalizedString(@"menu.duration") action:nil keyEquivalent:@""];
     NSMenu *durations = [[NSMenu alloc] initWithTitle:LocalizedString(@"menu.duration")];
-    for (NSNumber *minutes in @[@15, @30, @60, @120, @0]) {
+    for (NSNumber *minutes in @[@15, @30, @60, @120, @300, @480, @0]) {
         NSString *title = minutes.integerValue == 0 ? LocalizedString(@"duration.indefinite") :
-            [NSString stringWithFormat:LocalizedString(@"duration.minutes"), minutes.integerValue];
+            [NSString stringWithFormat:LocalizedString(minutes.integerValue >= 60 ? @"duration.hours" : @"duration.minutes"),
+                minutes.integerValue >= 60 ? minutes.integerValue / 60 : minutes.integerValue];
         NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:title action:@selector(startPreset:) keyEquivalent:@""];
         item.target = self;
         item.tag = minutes.integerValue * 60;
@@ -322,7 +323,7 @@ static NSString *LocalizedString(NSString *key) {
 
 - (void)presentStayAwakeAboutPanel:(id)sender {
     NSString *credits = LocalizedString(@"about.credits");
-    NSString *applicationVersion = [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"1.0.3";
+    NSString *applicationVersion = [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"1.0.4";
     NSImage *icon = [self applicationIcon] ?: NSApp.applicationIconImage;
     NSDictionary *options = @{
         NSAboutPanelOptionApplicationName: LocalizedString(@"app.name"),

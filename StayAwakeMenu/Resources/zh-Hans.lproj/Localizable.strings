@@ -41,3 +41,5 @@
 "countdown.hoursMinutes" = "%ld时 %ld分";
 "countdown.indefinite" = "On";
 "countdown.off" = "Off";
+
+"duration.hours" = "%ld 小时";
