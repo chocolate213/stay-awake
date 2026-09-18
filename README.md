@@ -6,8 +6,6 @@ Stay Awake is a lightweight, native macOS menu bar app that prevents idle sleep 
 
 Choose a duration, see the time remaining in the menu bar, and extend the session when your agent needs more time. It uses macOS's built-in `caffeinate` command without changing your system sleep settings.
 
-**让本地 AI Agent 持续工作。** Stay Awake 是一个轻量的 macOS 菜单栏防休眠工具，适合本地编程 Agent、自动化测试和长时间构建。支持预设或自定义时长、菜单栏倒计时、随时停止和延长 30 分钟。
-
 ## Features
 
 - Keep your Mac and display awake for **15, 30, 60, or 120 minutes**, or indefinitely.
