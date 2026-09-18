@@ -36,6 +36,7 @@ jobs:
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          REPLACE_RELEASE: ${{ github.event_name == 'push' && github.event.forced }}
           RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
         run: |
           test -n "$RELEASE_TAG"
@@ -45,7 +46,12 @@ jobs:
             found { print }
           ' CHANGELOG.md > build/release-notes.md
           test -s build/release-notes.md
-          gh release create "$RELEASE_TAG" release/*.zip release/*.sha256 \
-            --title "Stay Awake ${RELEASE_TAG}" \
-            --notes-file build/release-notes.md \
-            --verify-tag
+          if [ "$REPLACE_RELEASE" = "true" ]; then
+            gh release upload "$RELEASE_TAG" release/*.zip release/*.sha256 --clobber
+            gh release edit "$RELEASE_TAG" --notes-file build/release-notes.md
+          else
+            gh release create "$RELEASE_TAG" release/*.zip release/*.sha256 \
+              --title "Stay Awake ${RELEASE_TAG}" \
+              --notes-file build/release-notes.md \
+              --verify-tag
+          fi

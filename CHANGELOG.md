@@ -2,8 +2,8 @@
 
 ## 1.0.4
 
-- Add 5-hour and 8-hour keep-awake presets alongside 15min, 30min, 1h, and 2h.
-- Show compact English duration labels and localized hour labels; retain indefinite and custom sessions.
+- Add 5-hour and 8-hour keep-awake presets alongside 15 minutes, 30 minutes, 1 hour, and 2 hours.
+- Use full duration units with spaces and correct English singular/plural forms; retain indefinite and custom sessions.
 
 ## 1.0.3
 

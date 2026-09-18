@@ -43,3 +43,5 @@
 "countdown.off" = "Off";
 
 "duration.hours" = "%ld 小时";
+
+"duration.hour" = "%ld 小时";
