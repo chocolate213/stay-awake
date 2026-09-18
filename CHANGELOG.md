@@ -2,6 +2,8 @@
 
 ## 1.0.4
 
+- Remove the checkmark from the On/Off action to avoid confusing the next action with the current state.
+
 - Add 5-hour and 8-hour keep-awake presets alongside 15 minutes, 30 minutes, 1 hour, and 2 hours.
 - Use full duration units with spaces and correct English singular/plural forms; retain indefinite and custom sessions.
 

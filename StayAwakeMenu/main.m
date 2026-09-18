@@ -250,7 +250,8 @@ static NSString *LocalizedString(NSString *key) {
     self.statusMenuItem.state = NSControlStateValueOff;
     self.toggleMenuItem.title = isRunning ? LocalizedString(@"menu.toggle.off") : LocalizedString(@"menu.toggle.on");
     self.toggleMenuItem.image = nil;
-    self.toggleMenuItem.state = isRunning ? NSControlStateValueOn : NSControlStateValueOff;
+    // This item names an action; current status is shown separately.
+    self.toggleMenuItem.state = NSControlStateValueOff;
 
     NSStatusBarButton *button = self.statusItem.button;
     button.image = [self statusBarImageForRunning:isRunning];

@@ -39,6 +39,7 @@ int main(int argc, const char *argv[]) {
         app.helperSource = [NSURL fileURLWithPath:@(argv[1])];
         @try {
             [app configureStatusItem];
+            Check(app.toggleMenuItem.state == NSControlStateValueOff, @"inactive toggle action has no checkmark");
             Check(app.durationMenuItem.submenu.numberOfItems == 9, @"preset and custom actions present");
             NSArray<NSString *> *expectedTitles = [@(argv[2]) isEqualToString:@"en"] ?
                 @[@"15 minutes", @"30 minutes", @"1 hour", @"2 hours", @"5 hours", @"8 hours"] :
@@ -69,6 +70,7 @@ int main(int argc, const char *argv[]) {
 
             Check([app startStayAwakeForSeconds:3 notifying:NO], @"start timed session");
             NSTask *first = app.startedTask;
+            Check(app.toggleMenuItem.state == NSControlStateValueOff, @"active toggle action has no checkmark");
             [app refreshStatus];
             Check(app.statusItem.button.title.length > 0 && app.extendMenuItem.enabled, @"timed session displays countdown and enables extension");
             Check([app activeDeadline].timeIntervalSinceNow > 1, @"deadline available immediately");
