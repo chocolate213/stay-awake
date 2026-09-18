@@ -16,10 +16,12 @@ run: install
 test:
 	bash tests/stay-awake-helper-tests.sh
 	bash tests/menu-source-tests.sh
+	bash tests/session-tests.sh
 
 verify: build
 	bash tests/stay-awake-helper-tests.sh
 	bash tests/menu-source-tests.sh
+	bash tests/session-tests.sh
 	plutil -lint "$(APP_PATH)/Contents/Info.plist"
 	codesign --verify --deep --strict --verbose=2 "$(APP_PATH)"
 

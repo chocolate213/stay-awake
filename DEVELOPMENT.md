@@ -35,7 +35,7 @@ The app resolves the best supported localization from the current macOS language
 
 The status bar icon uses SF Symbols via `NSImage imageWithSystemSymbolName:accessibilityDescription:`. When Stay Awake is on, the app shows `moon.stars.fill`; when it is off, the app shows `moon.zzz.fill`. Both states use full opacity so the state remains distinguishable even when macOS dims an inactive display's menu bar.
 
-The status item uses `NSSquareStatusItemLength`. The app does not manually tint the icon; the symbol remains a template image so AppKit applies the menu bar's active, highlighted, light, and dark appearances.
+The status item uses `NSVariableStatusItemLength` with monospaced digits beside the SF Symbol during timed sessions. The app does not manually tint the icon; the symbol remains a template image so AppKit applies the menu bar's active, highlighted, light, and dark appearances.
 
 ## App Icon
 
@@ -55,13 +55,21 @@ If the machine restarts while a wake lock is active, the previous PID file is st
 
 The app derives the Application Support location with `NSApplicationSupportDirectory` and `NSUserDomainMask`; no developer-machine absolute script path is embedded in the app.
 
+## Timed Sessions
+
+The menu passes seconds through the bundled helper's `--time` argument. `caffeinate -t` owns the timeout, while the app tracks an end date for presentation and wake reconciliation. A five-second timer runs in common run-loop modes, so an open menu does not freeze the countdown. A process termination handler clears the displayed running state without sending an expiry notification.
+
+`State/session.plist` stores the PID and optional deadline alongside the existing `caffeinate.pid`. Metadata is used only when it matches the current live PID. The CLI toggle clears the metadata when starting or stopping an indefinite session. Direct helper invocations remain independent.
+
+Changing or extending the duration starts the replacement process before terminating the previous one. If writing the new state fails, the existing session remains running. The app retains the existing bundle identifier and Application Support location across the repository rename.
+
 ## Build Checks
 
 ```bash
 make verify
 ```
 
-This compiles the app, validates `Info.plist`, and checks the ad-hoc code signature.
+This compiles the app, runs helper and session lifecycle tests (with short real `caffeinate` processes in temporary storage), validates `Info.plist`, and checks the ad-hoc code signature. Session tests cover custom input boundaries, countdown formatting, extension, manual stop, silent expiry, wake reconciliation, CLI metadata mismatch, and failed state writes.
 
 ## Release Packaging
 

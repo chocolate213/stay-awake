@@ -28,7 +28,7 @@ mkdir -p "$STATE_DIR" "$LOG_DIR"
 if is_running; then
   pid="$(<"$PID_FILE")"
   kill "$pid" 2>/dev/null || true
-  rm -f "$PID_FILE"
+  rm -f "$PID_FILE" "$STATE_DIR/session.plist"
   notify "已关闭，Mac 将恢复正常休眠/锁屏。"
   printf 'off\n'
 else
@@ -37,6 +37,7 @@ else
     exit 1
   }
 
+  rm -f "$STATE_DIR/session.plist"
   nohup "$STAY_AWAKE" -q >"$LOG_FILE" 2>&1 &
   printf '%s\n' "$!" >"$PID_FILE"
   notify "已开启，Mac 会保持唤醒直到再次点击关闭。"

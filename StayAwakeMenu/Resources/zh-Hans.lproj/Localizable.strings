@@ -23,3 +23,19 @@
 "alert.unknownError" = "未知错误";
 
 "about.credits" = "原生 macOS 菜单栏小工具，会安装本地辅助脚本并控制系统 caffeinate 命令。";
+
+"menu.duration" = "保持唤醒时长";
+"menu.extend" = "延长 30 分钟";
+"menu.status.indefinite" = "保持唤醒 · 直到手动停止";
+"menu.status.timed" = "剩余 %@ · %@ 结束";
+"duration.indefinite" = "无限期";
+"duration.minutes" = "%ld 分钟";
+"duration.custom" = "自定义时长…";
+"duration.custom.help" = "输入分钟数（1–10,080）。新时长从现在开始计时，并替换当前会话。";
+"duration.custom.invalid" = "请输入 1 到 10,080 之间的整数分钟数。";
+"duration.input" = "时长（分钟）";
+"duration.start" = "开始";
+"duration.cancel" = "取消";
+"countdown.lessThanMinute" = "<1分";
+"countdown.minutes" = "%ld分";
+"countdown.hoursMinutes" = "%ld时 %ld分";

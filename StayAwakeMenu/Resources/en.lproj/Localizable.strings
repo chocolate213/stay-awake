@@ -23,3 +23,19 @@
 "alert.unknownError" = "Unknown error";
 
 "about.credits" = "A tiny native macOS menu bar app that installs a local helper script and controls the system caffeinate command.";
+
+"menu.duration" = "Keep Awake For";
+"menu.extend" = "Extend by 30 Minutes";
+"menu.status.indefinite" = "Awake until stopped";
+"menu.status.timed" = "Remaining %@ · Ends at %@";
+"duration.indefinite" = "Indefinitely";
+"duration.minutes" = "%ld minutes";
+"duration.custom" = "Custom Duration…";
+"duration.custom.help" = "Enter a duration in minutes (1–10,080). A new duration starts now and replaces the current session.";
+"duration.custom.invalid" = "Enter a whole number from 1 to 10,080 minutes.";
+"duration.input" = "Duration in minutes";
+"duration.start" = "Start";
+"duration.cancel" = "Cancel";
+"countdown.lessThanMinute" = "<1m";
+"countdown.minutes" = "%ldm";
+"countdown.hoursMinutes" = "%ldh %ldm";

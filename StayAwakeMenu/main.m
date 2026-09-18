@@ -2,6 +2,7 @@
 #import <UserNotifications/UserNotifications.h>
 #import <libproc.h>
 #import <signal.h>
+#import <math.h>
 
 static const CGFloat StatusIconPointSize = 18.0;
 
@@ -21,10 +22,13 @@ static NSString *LocalizedString(NSString *key) {
 @property(nonatomic, strong) NSMenuItem *statusMenuItem;
 @property(nonatomic, strong) NSMenuItem *toggleMenuItem;
 @property(nonatomic, strong) NSMenuItem *openScriptMenuItem;
+@property(nonatomic, strong) NSMenuItem *durationMenuItem;
+@property(nonatomic, strong) NSMenuItem *extendMenuItem;
+@property(nonatomic, strong) NSTask *startedTask;
+@property(nonatomic, strong) NSDate *startedDeadline;
 @property(nonatomic, strong) NSMenuItem *aboutMenuItem;
 @property(nonatomic, strong) NSMenuItem *quitMenuItem;
 @property(nonatomic, strong) NSTimer *refreshTimer;
-@property(nonatomic, assign) pid_t lastStartedPid;
 @end
 
 @implementation StayAwakeApp
@@ -60,6 +64,10 @@ static NSString *LocalizedString(NSString *key) {
     return [[self stateDirectory] URLByAppendingPathComponent:@"caffeinate.pid"];
 }
 
+- (NSURL *)sessionFile {
+    return [[self stateDirectory] URLByAppendingPathComponent:@"session.plist"];
+}
+
 - (NSURL *)logFile {
     return [[self logsDirectory] URLByAppendingPathComponent:@"stay-awake.log"];
 }
@@ -74,7 +82,9 @@ static NSString *LocalizedString(NSString *key) {
     }
     [self configureStatusItem];
     [self refreshStatus];
-    self.refreshTimer = [NSTimer scheduledTimerWithTimeInterval:5 target:self selector:@selector(refreshStatus) userInfo:nil repeats:YES];
+    self.refreshTimer = [NSTimer timerWithTimeInterval:5 target:self selector:@selector(refreshStatus) userInfo:nil repeats:YES];
+    [NSRunLoop.mainRunLoop addTimer:self.refreshTimer forMode:NSRunLoopCommonModes];
+    [NSWorkspace.sharedWorkspace.notificationCenter addObserver:self selector:@selector(workspaceDidWake:) name:NSWorkspaceDidWakeNotification object:nil];
 }
 
 - (void)applicationWillTerminate:(NSNotification *)notification {
@@ -96,13 +106,13 @@ static NSString *LocalizedString(NSString *key) {
 }
 
 - (void)configureStatusItem {
-    self.statusItem = [NSStatusBar.systemStatusBar statusItemWithLength:NSSquareStatusItemLength];
-    self.statusItem.length = StatusIconPointSize;
+    self.statusItem = [NSStatusBar.systemStatusBar statusItemWithLength:NSVariableStatusItemLength];
     self.statusItem.autosaveName = @"local.stay-awake.menu.status-item";
 
     NSStatusBarButton *button = self.statusItem.button;
     button.image = [self statusBarImageForRunning:NO];
-    button.imagePosition = NSImageOnly;
+    button.imagePosition = NSImageLeft;
+    button.font = [NSFont monospacedDigitSystemFontOfSize:12 weight:NSFontWeightRegular];
     button.imageScaling = NSImageScaleProportionallyDown;
     if (@available(macOS 11.0, *)) {
         button.symbolConfiguration = [NSImageSymbolConfiguration configurationWithPointSize:StatusIconPointSize weight:NSFontWeightSemibold scale:NSImageSymbolScaleMedium];
@@ -136,6 +146,25 @@ static NSString *LocalizedString(NSString *key) {
 
     [menu addItem:self.statusMenuItem];
     [menu addItem:self.toggleMenuItem];
+    self.durationMenuItem = [[NSMenuItem alloc] initWithTitle:LocalizedString(@"menu.duration") action:nil keyEquivalent:@""];
+    NSMenu *durations = [[NSMenu alloc] initWithTitle:LocalizedString(@"menu.duration")];
+    for (NSNumber *minutes in @[@15, @30, @60, @120, @0]) {
+        NSString *title = minutes.integerValue == 0 ? LocalizedString(@"duration.indefinite") :
+            [NSString stringWithFormat:LocalizedString(@"duration.minutes"), minutes.integerValue];
+        NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:title action:@selector(startPreset:) keyEquivalent:@""];
+        item.target = self;
+        item.tag = minutes.integerValue * 60;
+        [durations addItem:item];
+    }
+    [durations addItem:NSMenuItem.separatorItem];
+    NSMenuItem *custom = [[NSMenuItem alloc] initWithTitle:LocalizedString(@"duration.custom") action:@selector(startCustom:) keyEquivalent:@""];
+    custom.target = self;
+    [durations addItem:custom];
+    self.durationMenuItem.submenu = durations;
+    [menu addItem:self.durationMenuItem];
+    self.extendMenuItem = [[NSMenuItem alloc] initWithTitle:LocalizedString(@"menu.extend") action:@selector(extendSession:) keyEquivalent:@""];
+    self.extendMenuItem.target = self;
+    [menu addItem:self.extendMenuItem];
     [menu addItem:NSMenuItem.separatorItem];
     [menu addItem:self.openScriptMenuItem];
     [menu addItem:self.aboutMenuItem];
@@ -178,7 +207,37 @@ static NSString *LocalizedString(NSString *key) {
     self.quitMenuItem.state = NSControlStateValueOff;
 }
 
+- (void)workspaceDidWake:(NSNotification *)notification {
+    (void)notification;
+    [self refreshStatus];
+}
+
+// Metadata belongs to a particular process. A CLI toggle can replace that process.
+- (NSDate *)activeDeadline {
+    pid_t pid = [self runningPid];
+    if (self.startedTask.running && self.startedTask.processIdentifier == pid) {
+        return self.startedDeadline;
+    }
+    NSDictionary *session = [NSDictionary dictionaryWithContentsOfURL:[self sessionFile]];
+    if (pid > 0 && [session[@"pid"] intValue] == pid && [session[@"deadline"] isKindOfClass:NSDate.class]) {
+        return session[@"deadline"];
+    }
+    return nil;
+}
+
+- (NSString *)countdownForSeconds:(NSTimeInterval)seconds {
+    if (seconds < 60) return LocalizedString(@"countdown.lessThanMinute");
+    NSInteger minutes = (NSInteger)ceil(seconds / 60.0);
+    if (minutes < 60) return [NSString stringWithFormat:LocalizedString(@"countdown.minutes"), minutes];
+    return [NSString stringWithFormat:LocalizedString(@"countdown.hoursMinutes"), minutes / 60, minutes % 60];
+}
+
 - (void)refreshStatus {
+    NSDate *deadline = [self activeDeadline];
+    if (deadline && deadline.timeIntervalSinceNow <= 0) {
+        // Reconcile after system sleep too: an expired session must not restart.
+        [self stopStayAwakeNotifying:NO];
+    }
     [self updateLocalizedMenuText];
     [self applyStatusPresentationForRunning:[self stayAwakeIsRunningOrStarting]];
 }
@@ -192,8 +251,19 @@ static NSString *LocalizedString(NSString *key) {
 
     NSStatusBarButton *button = self.statusItem.button;
     button.image = [self statusBarImageForRunning:isRunning];
+    NSDate *deadline = isRunning ? [self activeDeadline] : nil;
+    button.title = deadline ? [@" " stringByAppendingString:[self countdownForSeconds:MAX(0, deadline.timeIntervalSinceNow)]] : @"";
+    self.extendMenuItem.enabled = isRunning && deadline != nil && deadline.timeIntervalSinceNow > 0;
+    if (deadline) {
+        NSString *endTime = [NSDateFormatter localizedStringFromDate:deadline dateStyle:NSDateFormatterNoStyle timeStyle:NSDateFormatterShortStyle];
+        self.statusMenuItem.title = [NSString stringWithFormat:LocalizedString(@"menu.status.timed"), [self countdownForSeconds:MAX(0, deadline.timeIntervalSinceNow)], endTime];
+    } else if (isRunning) {
+        self.statusMenuItem.title = LocalizedString(@"menu.status.indefinite");
+    }
     button.alphaValue = 1.0;
     button.toolTip = isRunning ? LocalizedString(@"tooltip.on") : LocalizedString(@"tooltip.off");
+    if (deadline) button.toolTip = self.statusMenuItem.title;
+    button.accessibilityLabel = self.statusMenuItem.title;
     button.needsDisplay = YES;
 }
 
@@ -206,7 +276,7 @@ static NSString *LocalizedString(NSString *key) {
         return YES;
     }
 
-    return self.lastStartedPid > 0 && kill(self.lastStartedPid, 0) == 0;
+    return self.startedTask.running;
 }
 
 - (void)toggleStayAwake:(id)sender {
@@ -221,7 +291,7 @@ static NSString *LocalizedString(NSString *key) {
     }
 
     if (shouldRun) {
-        if ([self startStayAwake]) {
+        if ([self startStayAwakeForSeconds:0 notifying:YES]) {
             [self applyStatusPresentationForRunning:YES];
             [self scheduleStatusVerification];
         } else {
@@ -264,7 +334,59 @@ static NSString *LocalizedString(NSString *key) {
     [NSApp orderFrontStandardAboutPanelWithOptions:options];
 }
 
-- (BOOL)startStayAwake {
+- (void)startPreset:(NSMenuItem *)sender {
+    [self replaceSessionWithSeconds:sender.tag];
+}
+
+- (NSTimeInterval)secondsForCustomMinutes:(NSString *)text {
+    NSString *value = [text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+    if (value.length == 0 || value.length > 5 || [value rangeOfCharacterFromSet:[NSCharacterSet characterSetWithCharactersInString:@"0123456789"].invertedSet].location != NSNotFound) return -1;
+    NSInteger minutes = value.integerValue;
+    return minutes >= 1 && minutes <= 10080 ? minutes * 60 : -1;
+}
+
+- (void)startCustom:(id)sender {
+    (void)sender;
+    NSAlert *alert = [[NSAlert alloc] init];
+    alert.messageText = LocalizedString(@"duration.custom");
+    alert.informativeText = LocalizedString(@"duration.custom.help");
+    [alert addButtonWithTitle:LocalizedString(@"duration.start")];
+    [alert addButtonWithTitle:LocalizedString(@"duration.cancel")];
+    NSTextField *input = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 260, 24)];
+    input.stringValue = @"90";
+    input.accessibilityLabel = LocalizedString(@"duration.input");
+    alert.accessoryView = input;
+    [NSApp activateIgnoringOtherApps:YES];
+    alert.window.initialFirstResponder = input;
+    while ([alert runModal] == NSAlertFirstButtonReturn) {
+        NSTimeInterval seconds = [self secondsForCustomMinutes:input.stringValue];
+        if (seconds > 0) {
+            [self replaceSessionWithSeconds:seconds];
+            return;
+        }
+        alert.informativeText = LocalizedString(@"duration.custom.invalid");
+    }
+}
+
+- (void)replaceSessionWithSeconds:(NSTimeInterval)seconds {
+    // Launch the replacement before stopping the previous process.
+    [self startStayAwakeForSeconds:seconds notifying:NO];
+    [self refreshStatus];
+    [self scheduleStatusVerification];
+}
+
+- (void)extendSession:(id)sender {
+    (void)sender;
+    NSDate *deadline = [self activeDeadline];
+    if (deadline && deadline.timeIntervalSinceNow > 0) {
+        [self replaceSessionWithSeconds:ceil(deadline.timeIntervalSinceNow) + 1800];
+    } else {
+        [self refreshStatus];
+    }
+}
+
+- (BOOL)startStayAwakeForSeconds:(NSTimeInterval)seconds notifying:(BOOL)notify {
+
     NSError *error = nil;
     if (![self installHelperIfNeededWithError:&error]) {
         [self showAlert:LocalizedString(@"alert.installHelper.title") detail:error.localizedDescription];
@@ -290,22 +412,52 @@ static NSString *LocalizedString(NSString *key) {
     NSTask *task = [[NSTask alloc] init];
     task.executableURL = helperURL;
     NSString *watchPid = [NSString stringWithFormat:@"%d", NSProcessInfo.processInfo.processIdentifier];
-    task.arguments = @[@"-q", @"--watch-pid", watchPid];
+    NSMutableArray *arguments = [NSMutableArray arrayWithArray:@[@"-q", @"--watch-pid", watchPid]];
+    if (seconds > 0) [arguments addObjectsFromArray:@[@"--time", [NSString stringWithFormat:@"%.0f", ceil(seconds)]]];
+    task.arguments = arguments;
     task.currentDirectoryURL = [helperURL URLByDeletingLastPathComponent];
     task.standardOutput = logHandle;
     task.standardError = logHandle;
 
+    pid_t previousPid = [self runningPid];
+    NSTask *previousTask = self.startedTask;
+    NSData *previousSession = [NSData dataWithContentsOfURL:[self sessionFile]];
     @try {
         [task launch];
-        NSString *pidText = [NSString stringWithFormat:@"%d\n", task.processIdentifier];
-        [pidText writeToURL:[self pidFile] atomically:YES encoding:NSUTF8StringEncoding error:&error];
-        if (error) {
+        NSDate *deadline = seconds > 0 ? [NSDate dateWithTimeIntervalSinceNow:ceil(seconds)] : nil;
+        NSMutableDictionary *session = [NSMutableDictionary dictionaryWithObject:@(task.processIdentifier) forKey:@"pid"];
+        if (deadline) session[@"deadline"] = deadline;
+        NSData *sessionData = [NSPropertyListSerialization dataWithPropertyList:session format:NSPropertyListXMLFormat_v1_0 options:0 error:&error];
+        if (!sessionData || ![sessionData writeToURL:[self sessionFile] options:NSDataWritingAtomic error:&error]) {
             [task terminate];
             [self showAlert:LocalizedString(@"alert.pidFile.title") detail:error.localizedDescription];
             return NO;
         }
-        self.lastStartedPid = task.processIdentifier;
-        [self showNotification:LocalizedString(@"notification.on")];
+        NSString *pidText = [NSString stringWithFormat:@"%d\n", task.processIdentifier];
+        [pidText writeToURL:[self pidFile] atomically:YES encoding:NSUTF8StringEncoding error:&error];
+        if (error) {
+            [task terminate];
+            if (previousSession) [previousSession writeToURL:[self sessionFile] atomically:YES];
+            else [NSFileManager.defaultManager removeItemAtURL:[self sessionFile] error:nil];
+            [self showAlert:LocalizedString(@"alert.pidFile.title") detail:error.localizedDescription];
+            return NO;
+        }
+        self.startedTask = task;
+        self.startedDeadline = deadline;
+        if (previousTask.running) [previousTask terminate];
+        else if (previousPid > 0) kill(previousPid, SIGTERM);
+        __weak StayAwakeApp *weakSelf = self;
+        task.terminationHandler = ^(NSTask *finished) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                StayAwakeApp *owner = weakSelf;
+                if (owner.startedTask == finished) {
+                    owner.startedTask = nil;
+                    owner.startedDeadline = nil;
+                    [owner refreshStatus];
+                }
+            });
+        };
+        if (notify) [self showNotification:LocalizedString(@"notification.on")];
         return YES;
     } @catch (NSException *exception) {
         [self showAlert:LocalizedString(@"alert.startFailed.title") detail:exception.reason ?: LocalizedString(@"alert.unknownError")];
@@ -314,22 +466,30 @@ static NSString *LocalizedString(NSString *key) {
 }
 
 - (void)stopStayAwake {
+    [self stopStayAwakeNotifying:YES];
+}
+
+- (void)stopStayAwakeNotifying:(BOOL)notify {
     pid_t pid = [self runningPid];
-    if (pid == 0 && self.lastStartedPid > 0 && kill(self.lastStartedPid, 0) == 0) {
-        pid = self.lastStartedPid;
+    BOOL wasRunning = pid > 0 || self.startedTask.running;
+    if (self.startedTask.running) {
+        [self.startedTask terminate];
+        if (pid == self.startedTask.processIdentifier) pid = 0;
     }
     if (pid != 0) {
         kill(pid, SIGTERM);
     }
-    self.lastStartedPid = 0;
+    self.startedTask = nil;
+    self.startedDeadline = nil;
     [NSFileManager.defaultManager removeItemAtURL:[self pidFile] error:nil];
-    [self showNotification:LocalizedString(@"notification.off")];
+    [NSFileManager.defaultManager removeItemAtURL:[self sessionFile] error:nil];
+    if (notify && wasRunning) [self showNotification:LocalizedString(@"notification.off")];
 }
 
 - (pid_t)runningPid {
     if ([self pidFilePredatesCurrentBoot]) {
         [NSFileManager.defaultManager removeItemAtURL:[self pidFile] error:nil];
-        self.lastStartedPid = 0;
+        [NSFileManager.defaultManager removeItemAtURL:[self sessionFile] error:nil];
         return 0;
     }
 
@@ -337,9 +497,12 @@ static NSString *LocalizedString(NSString *key) {
     pid_t pid = (pid_t)[pidText integerValue];
     if (pid <= 0 || kill(pid, 0) != 0) {
         [NSFileManager.defaultManager removeItemAtURL:[self pidFile] error:nil];
+        [NSFileManager.defaultManager removeItemAtURL:[self sessionFile] error:nil];
         return 0;
     }
 
+    // The helper shell briefly exists before exec replaces it with caffeinate.
+    if (self.startedTask.running && self.startedTask.processIdentifier == pid) return pid;
     NSString *executableName = [self executableNameForPid:pid];
     return [executableName isEqualToString:@"caffeinate"] ? pid : 0;
 }

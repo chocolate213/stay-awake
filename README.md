@@ -1,18 +1,31 @@
 # Stay Awake
 
-A tiny native macOS menu bar app for keeping your Mac awake on demand.
+**Keep your Mac awake while local AI agents work.**
 
-The app bundles its own helper script. On first launch, it installs that helper into the current user's Application Support directory and uses it to control the system `caffeinate` command.
+Stay Awake is a lightweight, native macOS menu bar app that prevents idle sleep during long-running local coding agent sessions. Use it while an agent edits code, runs tests, builds a project, or works through a task in your terminal or editor.
+
+Choose a duration, see the time remaining in the menu bar, and extend the session when your agent needs more time. It uses macOS's built-in `caffeinate` command without changing your system sleep settings.
+
+**让本地 AI Agent 持续工作。** Stay Awake 是一个轻量的 macOS 菜单栏防休眠工具，适合本地编程 Agent、自动化测试和长时间构建。支持预设或自定义时长、菜单栏倒计时、随时停止和延长 30 分钟。
 
 ## Features
 
-- Native AppKit menu bar app with no Dock icon.
-- One-click menu toggle for the bundled `stay-awake` helper.
-- Installs the helper script into Application Support at runtime, so the app is not tied to any developer machine path.
-- Shared state with the optional CLI helper through the app's Application Support directory.
-- Localized UI for English and Simplified Chinese, selected by macOS language preferences.
-- Image-generated macOS app icon packaged as `AppIcon.icns`.
-- SF Symbol status bar icon configured through `NSStatusBarButton`: `moon.stars.fill` when on, `moon.zzz.fill` when off.
+- Keep your Mac and display awake for **15, 30, 60, or 120 minutes**, or indefinitely.
+- Set a **custom duration** from 1 to 10,080 minutes (7 days).
+- See **remaining time in the menu bar** and the expected end time in the menu.
+- **Extend by 30 minutes** without resetting the remaining time, or stop at any time.
+- Restore normal sleep behavior silently when the timer expires; no expiry notification.
+- Native AppKit app with SF Symbols, no Dock icon, and English / Simplified Chinese UI.
+- Bundled CLI helper and an optional toggle script that shares the app's running state.
+
+## For Local Agent Workflows
+
+1. Start your local AI coding agent, terminal automation, test suite, or build.
+2. Open Stay Awake and choose **Keep Awake For → 60 minutes** (or your own duration).
+3. Check the countdown at a glance. Choose **Extend by 30 Minutes** if the task is still running.
+4. Stop Stay Awake when finished, or let the timer expire.
+
+Stay Awake prevents idle sleep; it does not launch or supervise the agent, bypass its approval prompts, or remove service usage limits. Keep a MacBook's lid open. Ending a session releases this app's sleep assertions and lets macOS apply its normal rules; it does not force immediate sleep, and other apps may still keep the Mac awake.
 
 ## Requirements
 
@@ -22,7 +35,7 @@ Building from source also requires Xcode Command Line Tools.
 
 ## Install
 
-Download the latest `Stay-Awake-<version>-macOS.zip` from GitHub Releases, unzip it, then move `Stay Awake.app` to your Applications folder.
+Download the latest `Stay-Awake-<version>-macOS.zip` from [GitHub Releases](https://github.com/chocolate213/stay-awake/releases), unzip it, then move `Stay Awake.app` to your Applications folder.
 
 ```text
 /Applications/Stay Awake.app
@@ -40,18 +53,27 @@ On first launch, the app installs its bundled helper script under the current us
 
 ## Usage
 
-- `moon.zzz.fill`: Stay Awake is off.
-- `moon.stars.fill`: Stay Awake is on.
-- Click the menu bar icon and choose Turn Stay Awake On/Off to toggle.
-- Choose Quit to stop `caffeinate` and exit the menu app.
+Click the moon icon to open the menu:
+
+| Action / state | Behavior |
+| --- | --- |
+| Turn Stay Awake On | Start an indefinite session. |
+| Keep Awake For | Choose a preset or a custom number of minutes. A new duration replaces the current session, starting now. |
+| Extend by 30 Minutes | Add 30 minutes to the remaining time. Available only during a timed session. |
+| Turn Stay Awake Off | Stop the current session immediately. |
+| Quit | Stop the current session and exit the app. |
+
+The active moon icon indicates that Stay Awake is on; the sleeping moon means it is off. Timed sessions also show a compact countdown such as `42m`, `1h 20m`, or `<1m`. Indefinite sessions show only the icon. The countdown refreshes every few seconds, including while the menu is open.
+
+Custom durations accept whole minutes from 1 to 10,080. Cancel leaves the current session unchanged. After sleep or wake, the app reconciles an expired deadline instead of starting the timer again.
 
 ## Install From Source
 
 Clone the repository and enter the project directory:
 
 ```bash
-git clone <repository-url>
-cd stay-awake-menu
+git clone https://github.com/chocolate213/stay-awake.git
+cd stay-awake
 ```
 
 Build, install, and launch the app:
@@ -99,7 +121,9 @@ The menu bar app installs the helper script on launch. For terminal-only workflo
 scripts/stay-awake-toggle
 ```
 
-It uses the same installed helper and state file as the app, so CLI and menu bar status stay in sync.
+The toggle script stops the current session or starts an indefinite one using the same installed helper and PID file as the app, so the menu follows those changes. Launching the helper directly is a separate terminal session and does not publish a menu bar countdown.
+
+The Application Support directory keeps its existing `local.stay-awake.menu` identifier for compatibility with earlier installations; the repository is now named `stay-awake`.
 
 ## Uninstall
 
