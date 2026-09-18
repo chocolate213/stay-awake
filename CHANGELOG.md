@@ -1,11 +1,10 @@
 # Changelog
 
-## Unreleased
+## 1.0.1
 
 - Add preset and custom keep-awake durations, a menu bar countdown, and a 30-minute extension action.
 - Reconcile timed sessions on process exit and system wake without expiry notifications.
 - Rename the repository to `stay-awake` and document its focus on local AI agent workflows.
-
 
 ## 1.0.0
 

@@ -320,7 +320,7 @@ static NSString *LocalizedString(NSString *key) {
 
 - (void)presentStayAwakeAboutPanel:(id)sender {
     NSString *credits = LocalizedString(@"about.credits");
-    NSString *applicationVersion = [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"1.0.0";
+    NSString *applicationVersion = [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"1.0.1";
     NSImage *icon = [self applicationIcon] ?: NSApp.applicationIconImage;
     NSDictionary *options = @{
         NSAboutPanelOptionApplicationName: LocalizedString(@"app.name"),
