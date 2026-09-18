@@ -4,6 +4,10 @@
 
 A native macOS menu bar app powered by the system `caffeinate` command. Prevent idle sleep while your agent codes, tests, or builds, without changing system sleep settings.
 
+![Stay Awake interface preview: menu bar countdown, a 30-minute extension, and a Keep Awake Until time picker.](docs/images/stay-awake-overview.png)
+
+*Interface illustration based on the app; appearance may vary by macOS version.*
+
 ## Features
 
 - Presets: **15 or 30 minutes; 1, 2, 3, 4, 5, or 8 hours**, plus indefinite sessions.
