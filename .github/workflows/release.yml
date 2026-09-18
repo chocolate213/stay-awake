@@ -39,7 +39,13 @@ jobs:
           RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
         run: |
           test -n "$RELEASE_TAG"
+          awk -v version="${RELEASE_TAG#v}" '
+            $0 == "## " version { found=1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md > build/release-notes.md
+          test -s build/release-notes.md
           gh release create "$RELEASE_TAG" release/*.zip release/*.sha256 \
             --title "Stay Awake ${RELEASE_TAG}" \
-            --generate-notes \
+            --notes-file build/release-notes.md \
             --verify-tag

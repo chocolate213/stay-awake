@@ -39,3 +39,5 @@
 "countdown.lessThanMinute" = "<1分";
 "countdown.minutes" = "%ld分";
 "countdown.hoursMinutes" = "%ld时 %ld分";
+"countdown.indefinite" = "On";
+"countdown.off" = "Off";

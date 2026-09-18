@@ -63,7 +63,7 @@ Click the moon icon to open the menu:
 | Turn Stay Awake Off | Stop the current session immediately. |
 | Quit | Stop the current session and exit the app. |
 
-The active moon icon indicates that Stay Awake is on; the sleeping moon means it is off. Timed sessions also show a compact countdown such as `42m`, `1h 20m`, or `<1m`. Indefinite sessions show only the icon. The countdown refreshes every few seconds, including while the menu is open.
+The active moon icon indicates that Stay Awake is on; the sleeping moon means it is off. Timed sessions also show a compact countdown such as `42m`, `1h 20m`, or `<1m`. Indefinite sessions show `On` beside the icon until stopped; inactive sessions show `Off`. The countdown refreshes every few seconds, including while the menu is open.
 
 Custom durations accept whole minutes from 1 to 10,080. Cancel leaves the current session unchanged. After sleep or wake, the app reconciles an expired deadline instead of starting the timer again.
 

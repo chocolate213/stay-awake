@@ -35,11 +35,23 @@ The app resolves the best supported localization from the current macOS language
 
 The status bar icon uses SF Symbols via `NSImage imageWithSystemSymbolName:accessibilityDescription:`. When Stay Awake is on, the app shows `moon.stars.fill`; when it is off, the app shows `moon.zzz.fill`. Both states use full opacity so the state remains distinguishable even when macOS dims an inactive display's menu bar.
 
-The status item uses `NSVariableStatusItemLength` with monospaced digits beside the SF Symbol during timed sessions. The app does not manually tint the icon; the symbol remains a template image so AppKit applies the menu bar's active, highlighted, light, and dark appearances.
+The status item uses `NSVariableStatusItemLength` with monospaced digits beside the SF Symbol during timed sessions. Both symbols use a 16-point regular configuration and `NSImageScaleNone`, keeping the icon at the same size with or without countdown text. The app does not manually tint the icon; the symbol remains a template image so AppKit applies the menu bar's active, highlighted, light, and dark appearances.
 
 ## App Icon
 
-`StayAwakeMenu/Assets/AppIconSource.png` is the generated source artwork for the app icon. The build script uses `tools/prepare_app_icon.m` to resize it into the standard macOS iconset sizes, remove the generated dark outer background from the connected image edges, and then uses `iconutil` to create `AppIcon.icns`.
+`StayAwakeMenu/Assets/StayAwake.icon` is the editable Icon Composer document, with original moon and spark SVG layers. Apple’s renderer supplies the Liquid Glass material, lighting, and rounded mask. `AppIconSource.png` is its 1024 × 1024 default macOS render (design generation 27).
+
+To refresh the checked-in render after editing the document, use the `ictool` executable inside your Icon Composer installation:
+
+```bash
+"$ICON_COMPOSER_APP/Contents/Executables/ictool" \
+  StayAwakeMenu/Assets/StayAwake.icon --export-image \
+  --output-file StayAwakeMenu/Assets/AppIconSource.png \
+  --platform macOS --rendition Default --width 1024 --height 1024 \
+  --scale 1 --design-generation 27
+```
+
+Set `ICON_COMPOSER_APP` to your installed application’s path. Normal builds require only the checked-in PNG and Command Line Tools. `tools/prepare_app_icon.m` preserves its colors and transparency, adds an 18% total inset for the legacy macOS icon canvas, and resizes it into standard iconset sizes; `iconutil` produces `AppIcon.icns`. The installed app currently uses this static Composer render, not an adaptive compiled Liquid Glass asset catalog. The layered document remains available for future Xcode asset-catalog integration.
 
 The prepared iconset includes a 1024 by 1024 representation to match Apple's current app icon specification for iOS, iPadOS, and macOS. The generated `.icns` is copied into the bundle and referenced by `CFBundleIconFile`.
 

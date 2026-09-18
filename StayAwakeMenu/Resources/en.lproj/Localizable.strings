@@ -39,3 +39,5 @@
 "countdown.lessThanMinute" = "<1m";
 "countdown.minutes" = "%ldm";
 "countdown.hoursMinutes" = "%ldh %ldm";
+"countdown.indefinite" = "On";
+"countdown.off" = "Off";

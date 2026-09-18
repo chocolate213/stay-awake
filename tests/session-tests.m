@@ -40,7 +40,7 @@ int main(int argc, const char *argv[]) {
         @try {
             [app configureStatusItem];
             Check(app.durationMenuItem.submenu.numberOfItems == 7, @"preset and custom actions present");
-            Check(!app.extendMenuItem.enabled && app.statusItem.button.title.length == 0, @"off state has no countdown or extension");
+            Check(!app.extendMenuItem.enabled && [app.statusItem.button.title isEqualToString:[@" " stringByAppendingString:LocalizedString(@"countdown.off")]], @"off state shows Off and disables extension");
             Check([app secondsForCustomMinutes:@"90"] == 5400, @"custom minutes");
             Check([app secondsForCustomMinutes:@" 1 "] == 60, @"custom lower bound");
             Check([app secondsForCustomMinutes:@"10080"] == 604800, @"custom upper bound");
@@ -73,7 +73,7 @@ int main(int argc, const char *argv[]) {
             [app refreshStatus];
             Check(!expiring.running && ![app stayAwakeIsRunningOrStarting], @"real caffeinate timeout ends session");
             Check(app.notificationCount == 0, @"expiration is silent");
-            Check(app.statusItem.button.title.length == 0 && !app.extendMenuItem.enabled, @"expiration removes countdown and disables extension");
+            Check([app.statusItem.button.title isEqualToString:[@" " stringByAppendingString:LocalizedString(@"countdown.off")]] && !app.extendMenuItem.enabled, @"expiration shows Off and disables extension");
             Check(![NSFileManager.defaultManager fileExistsAtPath:app.sessionFile.path], @"expiration cleans session metadata");
 
             Check([app startStayAwakeForSeconds:30 notifying:NO], @"start wake reconciliation session");
@@ -86,7 +86,7 @@ int main(int argc, const char *argv[]) {
             Check([app startStayAwakeForSeconds:0 notifying:NO], @"start indefinite session");
             NSTask *indefinite = app.startedTask;
             [app refreshStatus];
-            Check(![app activeDeadline] && app.statusItem.button.title.length == 0 && !app.extendMenuItem.enabled, @"indefinite has no countdown or extension");
+            Check(![app activeDeadline] && [app.statusItem.button.title isEqualToString:[@" " stringByAppendingString:LocalizedString(@"countdown.indefinite")]] && !app.extendMenuItem.enabled, @"indefinite shows its label and disables extension");
             [app extendSession:nil];
             Check(app.startedTask == indefinite, @"indefinite cannot be extended");
 

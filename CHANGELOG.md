@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.3
+
+- Redesign the application icon with a white background, blue-violet moon, and cyan spark using Apple Icon Composer. Include the editable layered source and a static render for the existing build pipeline.
+- Keep menu bar symbols at a consistent 16-point regular size with or without a countdown.
+- Show `On` for indefinite sessions and `Off` when inactive.
+- Preserve icon colors and transparency during packaging, and document reproducible icon exports.
+
 ## 1.0.1
 
 - Add preset and custom keep-awake durations, a menu bar countdown, and a 30-minute extension action.

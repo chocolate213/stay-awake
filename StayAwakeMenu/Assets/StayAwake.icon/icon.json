@@ -1,0 +1,63 @@
+{
+  "features" : [
+    "refractivity",
+    "specular-location"
+  ],
+  "fill" : {
+    "automatic-gradient" : "extended-srgb:0.97000,0.98000,1.00000,1.00000"
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "image-name" : "Moon.svg",
+          "name" : "Moon"
+        }
+      ],
+      "name" : "Moonlight",
+      "refractivity" : {
+        "depth" : 0.85,
+        "enabled" : true,
+        "strength" : 0.8
+      },
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.2
+      },
+      "specular" : "inside",
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.4
+      }
+    },
+    {
+      "layers" : [
+        {
+          "image-name" : "Spark.svg",
+          "name" : "Spark"
+        }
+      ],
+      "name" : "Spark",
+      "refractivity" : {
+        "depth" : 0.85,
+        "enabled" : true,
+        "strength" : 0.8
+      },
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.15
+      },
+      "specular" : "inside",
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.28
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}

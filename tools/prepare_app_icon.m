@@ -9,106 +9,6 @@ typedef struct {
     UInt8 alpha;
 } Pixel;
 
-static BOOL IsBackgroundCandidate(Pixel pixel) {
-    UInt8 maxChannel = MAX(pixel.red, MAX(pixel.green, pixel.blue));
-    return maxChannel < 118;
-}
-
-static void RemoveConnectedDarkBackground(Pixel *pixels, size_t width, size_t height) {
-    size_t count = width * height;
-    UInt8 *visited = calloc(count, sizeof(UInt8));
-    size_t *queue = malloc(count * sizeof(size_t));
-    if (!visited || !queue) {
-        free(visited);
-        free(queue);
-        return;
-    }
-
-    size_t head = 0;
-    size_t tail = 0;
-
-    for (size_t x = 0; x < width; x++) {
-        size_t topIndex = x;
-        size_t bottomIndex = (height - 1) * width + x;
-        if (!visited[topIndex] && IsBackgroundCandidate(pixels[topIndex])) {
-            visited[topIndex] = 1;
-            queue[tail++] = topIndex;
-        }
-        if (!visited[bottomIndex] && IsBackgroundCandidate(pixels[bottomIndex])) {
-            visited[bottomIndex] = 1;
-            queue[tail++] = bottomIndex;
-        }
-    }
-
-    for (size_t y = 0; y < height; y++) {
-        size_t leftIndex = y * width;
-        size_t rightIndex = y * width + width - 1;
-        if (!visited[leftIndex] && IsBackgroundCandidate(pixels[leftIndex])) {
-            visited[leftIndex] = 1;
-            queue[tail++] = leftIndex;
-        }
-        if (!visited[rightIndex] && IsBackgroundCandidate(pixels[rightIndex])) {
-            visited[rightIndex] = 1;
-            queue[tail++] = rightIndex;
-        }
-    }
-
-    while (head < tail) {
-        size_t index = queue[head++];
-        size_t x = index % width;
-        size_t y = index / width;
-
-#define ENQUEUE_NEIGHBOR(neighborIndex) \
-    do { \
-        size_t candidate = (neighborIndex); \
-        if (!visited[candidate] && IsBackgroundCandidate(pixels[candidate])) { \
-            visited[candidate] = 1; \
-            queue[tail++] = candidate; \
-        } \
-    } while (0)
-
-        if (x > 0) ENQUEUE_NEIGHBOR(index - 1);
-        if (x + 1 < width) ENQUEUE_NEIGHBOR(index + 1);
-        if (y > 0) ENQUEUE_NEIGHBOR(index - width);
-        if (y + 1 < height) ENQUEUE_NEIGHBOR(index + width);
-
-#undef ENQUEUE_NEIGHBOR
-    }
-
-    for (size_t index = 0; index < count; index++) {
-        if (!visited[index]) {
-            continue;
-        }
-
-        pixels[index].red = 0;
-        pixels[index].green = 0;
-        pixels[index].blue = 0;
-        pixels[index].alpha = 0;
-    }
-
-    free(visited);
-    free(queue);
-}
-
-static void NormalizeNearWhitePixels(Pixel *pixels, size_t width, size_t height) {
-    size_t count = width * height;
-    for (size_t index = 0; index < count; index++) {
-        Pixel *pixel = &pixels[index];
-        if (pixel->alpha == 0) {
-            continue;
-        }
-
-        UInt8 minChannel = MIN(pixel->red, MIN(pixel->green, pixel->blue));
-        UInt8 maxChannel = MAX(pixel->red, MAX(pixel->green, pixel->blue));
-        if (minChannel >= 236 && maxChannel - minChannel <= 20) {
-            pixel->red = 255;
-            pixel->green = 255;
-            pixel->blue = 255;
-            pixel->alpha = 255;
-        }
-    }
-}
-
 static CGImageRef CreatePreparedIconImage(NSURL *sourceURL, size_t pixels) {
     CGImageSourceRef source = CGImageSourceCreateWithURL((__bridge CFURLRef)sourceURL, NULL);
     if (!source) {
@@ -145,15 +45,14 @@ static CGImageRef CreatePreparedIconImage(NSURL *sourceURL, size_t pixels) {
     }
 
     CGContextSetInterpolationQuality(context, kCGInterpolationHigh);
-    CGFloat artworkScale = 1.18;
+    // Inset the Composer render within the legacy macOS icon canvas.
+    CGFloat artworkScale = 0.82;
     CGFloat drawSize = (CGFloat)pixels * artworkScale;
     CGFloat drawOrigin = ((CGFloat)pixels - drawSize) / 2.0;
     CGRect drawRect = CGRectMake(drawOrigin, drawOrigin, drawSize, drawSize);
     CGContextDrawImage(context, drawRect, croppedImage);
     CGImageRelease(croppedImage);
 
-    RemoveConnectedDarkBackground(buffer, pixels, pixels);
-    NormalizeNearWhitePixels(buffer, pixels, pixels);
     CGImageRef outputImage = CGBitmapContextCreateImage(context);
     CGContextRelease(context);
     free(buffer);

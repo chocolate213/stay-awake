@@ -4,7 +4,7 @@
 #import <signal.h>
 #import <math.h>
 
-static const CGFloat StatusIconPointSize = 18.0;
+static const CGFloat StatusIconPointSize = 16.0;
 
 static NSBundle *PreferredLocalizationBundle(void) {
     NSArray<NSString *> *supportedLocalizations = @[@"en", @"zh-Hans"];
@@ -113,9 +113,10 @@ static NSString *LocalizedString(NSString *key) {
     button.image = [self statusBarImageForRunning:NO];
     button.imagePosition = NSImageLeft;
     button.font = [NSFont monospacedDigitSystemFontOfSize:12 weight:NSFontWeightRegular];
-    button.imageScaling = NSImageScaleProportionallyDown;
+    // Keep the symbol at its configured size when the countdown changes button width.
+    button.imageScaling = NSImageScaleNone;
     if (@available(macOS 11.0, *)) {
-        button.symbolConfiguration = [NSImageSymbolConfiguration configurationWithPointSize:StatusIconPointSize weight:NSFontWeightSemibold scale:NSImageSymbolScaleMedium];
+        button.symbolConfiguration = [NSImageSymbolConfiguration configurationWithPointSize:StatusIconPointSize weight:NSFontWeightRegular scale:NSImageSymbolScaleMedium];
     }
 
     NSMenu *menu = [[NSMenu alloc] initWithTitle:LocalizedString(@"app.name")];
@@ -180,7 +181,7 @@ static NSString *LocalizedString(NSString *key) {
     if (@available(macOS 11.0, *)) {
         NSString *symbolName = isRunning ? @"moon.stars.fill" : @"moon.zzz.fill";
         NSImage *image = [NSImage imageWithSystemSymbolName:symbolName accessibilityDescription:LocalizedString(@"app.name")];
-        NSImageSymbolConfiguration *configuration = [NSImageSymbolConfiguration configurationWithPointSize:StatusIconPointSize weight:NSFontWeightSemibold scale:NSImageSymbolScaleMedium];
+        NSImageSymbolConfiguration *configuration = [NSImageSymbolConfiguration configurationWithPointSize:StatusIconPointSize weight:NSFontWeightRegular scale:NSImageSymbolScaleMedium];
         image = [image imageWithSymbolConfiguration:configuration] ?: image;
         image.template = YES;
         return image;
@@ -252,7 +253,8 @@ static NSString *LocalizedString(NSString *key) {
     NSStatusBarButton *button = self.statusItem.button;
     button.image = [self statusBarImageForRunning:isRunning];
     NSDate *deadline = isRunning ? [self activeDeadline] : nil;
-    button.title = deadline ? [@" " stringByAppendingString:[self countdownForSeconds:MAX(0, deadline.timeIntervalSinceNow)]] : @"";
+    NSString *statusText = deadline ? [self countdownForSeconds:MAX(0, deadline.timeIntervalSinceNow)] : LocalizedString(@"countdown.indefinite");
+    button.title = [@" " stringByAppendingString:isRunning ? statusText : LocalizedString(@"countdown.off")];
     self.extendMenuItem.enabled = isRunning && deadline != nil && deadline.timeIntervalSinceNow > 0;
     if (deadline) {
         NSString *endTime = [NSDateFormatter localizedStringFromDate:deadline dateStyle:NSDateFormatterNoStyle timeStyle:NSDateFormatterShortStyle];
@@ -320,7 +322,7 @@ static NSString *LocalizedString(NSString *key) {
 
 - (void)presentStayAwakeAboutPanel:(id)sender {
     NSString *credits = LocalizedString(@"about.credits");
-    NSString *applicationVersion = [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"1.0.1";
+    NSString *applicationVersion = [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"1.0.3";
     NSImage *icon = [self applicationIcon] ?: NSApp.applicationIconImage;
     NSDictionary *options = @{
         NSAboutPanelOptionApplicationName: LocalizedString(@"app.name"),
