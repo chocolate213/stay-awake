@@ -149,7 +149,7 @@ static NSString *LocalizedString(NSString *key) {
     [menu addItem:self.toggleMenuItem];
     self.durationMenuItem = [[NSMenuItem alloc] initWithTitle:LocalizedString(@"menu.duration") action:nil keyEquivalent:@""];
     NSMenu *durations = [[NSMenu alloc] initWithTitle:LocalizedString(@"menu.duration")];
-    for (NSNumber *minutes in @[@15, @30, @60, @120, @300, @480, @0]) {
+    for (NSNumber *minutes in @[@15, @30, @60, @120, @180, @240, @300, @480, @0]) {
         NSString *title = minutes.integerValue == 0 ? LocalizedString(@"duration.indefinite") :
             [NSString stringWithFormat:LocalizedString(minutes.integerValue == 60 ? @"duration.hour" :
                 (minutes.integerValue > 60 ? @"duration.hours" : @"duration.minutes")),

@@ -8,7 +8,7 @@ Choose a duration, see the time remaining in the menu bar, and extend the sessio
 
 ## Features
 
-- Keep your Mac and display awake for **15 or 30 minutes, or 1, 2, 5, or 8 hours**, or indefinitely.
+- Keep your Mac and display awake for **15 or 30 minutes, or 1, 2, 3, 4, 5, or 8 hours**, or indefinitely.
 - Set a **custom duration** from 1 to 10,080 minutes (7 days).
 - See **remaining time in the menu bar** and the expected end time in the menu.
 - **Extend by 30 minutes** without resetting the remaining time, or stop at any time.

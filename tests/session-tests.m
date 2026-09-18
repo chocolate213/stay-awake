@@ -40,16 +40,16 @@ int main(int argc, const char *argv[]) {
         @try {
             [app configureStatusItem];
             Check(app.toggleMenuItem.state == NSControlStateValueOff, @"inactive toggle action has no checkmark");
-            Check(app.durationMenuItem.submenu.numberOfItems == 9, @"preset and custom actions present");
+            Check(app.durationMenuItem.submenu.numberOfItems == 11, @"preset and custom actions present");
             NSArray<NSString *> *expectedTitles = [@(argv[2]) isEqualToString:@"en"] ?
-                @[@"15 minutes", @"30 minutes", @"1 hour", @"2 hours", @"5 hours", @"8 hours"] :
-                @[@"15 分钟", @"30 分钟", @"1 小时", @"2 小时", @"5 小时", @"8 小时"];
+                @[@"15 minutes", @"30 minutes", @"1 hour", @"2 hours", @"3 hours", @"4 hours", @"5 hours", @"8 hours"] :
+                @[@"15 分钟", @"30 分钟", @"1 小时", @"2 小时", @"3 小时", @"4 小时", @"5 小时", @"8 小时"];
             for (NSUInteger index = 0; index < expectedTitles.count; index++) {
                 Check([[app.durationMenuItem.submenu itemAtIndex:index].title isEqualToString:expectedTitles[index]], @"preset labels use spaced units and correct plural forms");
             }
-            for (NSUInteger index = 4; index <= 5; index++) {
+            for (NSUInteger index = 4; index <= 7; index++) {
                 NSMenuItem *preset = [app.durationMenuItem.submenu itemAtIndex:index];
-                NSInteger hours = index == 4 ? 5 : 8;
+                NSInteger hours = [@[@3, @4, @5, @8][index - 4] integerValue];
                 Check(preset.tag == hours * 3600, @"long presets use seconds");
                 [app startPreset:preset];
                 NSTimeInterval remaining = [app activeDeadline].timeIntervalSinceNow;
