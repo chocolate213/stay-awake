@@ -2,6 +2,9 @@
 
 ## 1.1.0
 
+- Remove the developer-facing Reveal Installed Helper menu item.
+- Simplify the README and add self-contained installation instructions for AI agents.
+
 - Add Keep Awake Until with a native time picker and a Today/Tomorrow preview.
 - Replace the custom minutes field with native hours/minutes inputs and steppers.
 - Use matching dialog sizes and large, easy-to-read time digits.

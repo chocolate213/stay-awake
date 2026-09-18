@@ -4,7 +4,6 @@
 "menu.status.off" = "状态：已关闭";
 "menu.toggle.on" = "开启保持唤醒";
 "menu.toggle.off" = "关闭保持唤醒";
-"menu.openScript" = "显示已安装脚本";
 "menu.about" = "关于保持唤醒";
 "menu.quit" = "退出";
 

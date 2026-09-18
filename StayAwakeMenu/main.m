@@ -107,7 +107,6 @@ static NSString *LocalizedString(NSString *key) {
 @property(nonatomic, strong) NSStatusItem *statusItem;
 @property(nonatomic, strong) NSMenuItem *statusMenuItem;
 @property(nonatomic, strong) NSMenuItem *toggleMenuItem;
-@property(nonatomic, strong) NSMenuItem *openScriptMenuItem;
 @property(nonatomic, strong) NSMenuItem *durationMenuItem;
 @property(nonatomic, strong) NSMenuItem *extendMenuItem;
 @property(nonatomic, strong) NSTask *startedTask;
@@ -218,11 +217,6 @@ static NSString *LocalizedString(NSString *key) {
     self.toggleMenuItem.target = self;
     self.toggleMenuItem.image = nil;
 
-    self.openScriptMenuItem = [[NSMenuItem alloc] initWithTitle:@"" action:@selector(openScriptLocation:) keyEquivalent:@""];
-    self.openScriptMenuItem.target = self;
-    self.openScriptMenuItem.image = nil;
-    self.openScriptMenuItem.state = NSControlStateValueOff;
-
     self.aboutMenuItem = [[NSMenuItem alloc] initWithTitle:@"" action:@selector(presentStayAwakeAboutPanel:) keyEquivalent:@""];
     self.aboutMenuItem.target = self;
     self.aboutMenuItem.image = nil;
@@ -260,7 +254,6 @@ static NSString *LocalizedString(NSString *key) {
     self.extendMenuItem.target = self;
     [menu addItem:self.extendMenuItem];
     [menu addItem:NSMenuItem.separatorItem];
-    [menu addItem:self.openScriptMenuItem];
     [menu addItem:self.aboutMenuItem];
     [menu addItem:NSMenuItem.separatorItem];
     [menu addItem:self.quitMenuItem];
@@ -290,9 +283,6 @@ static NSString *LocalizedString(NSString *key) {
 }
 
 - (void)updateLocalizedMenuText {
-    self.openScriptMenuItem.title = LocalizedString(@"menu.openScript");
-    self.openScriptMenuItem.image = nil;
-    self.openScriptMenuItem.state = NSControlStateValueOff;
     self.aboutMenuItem.title = LocalizedString(@"menu.about");
     self.aboutMenuItem.image = nil;
     self.aboutMenuItem.state = NSControlStateValueOff;
@@ -402,16 +392,6 @@ static NSString *LocalizedString(NSString *key) {
 
 - (void)quit:(id)sender {
     [NSApp terminate:nil];
-}
-
-- (void)openScriptLocation:(id)sender {
-    NSError *error = nil;
-    if (![self installHelperIfNeededWithError:&error]) {
-        [self showAlert:LocalizedString(@"alert.installHelper.title") detail:error.localizedDescription];
-        return;
-    }
-
-    [NSWorkspace.sharedWorkspace activateFileViewerSelectingURLs:@[[self installedHelperURL]]];
 }
 
 - (void)presentStayAwakeAboutPanel:(id)sender {

@@ -4,7 +4,6 @@
 "menu.status.off" = "Status: Off";
 "menu.toggle.on" = "Turn Stay Awake On";
 "menu.toggle.off" = "Turn Stay Awake Off";
-"menu.openScript" = "Reveal Installed Helper";
 "menu.about" = "About Stay Awake";
 "menu.quit" = "Quit";
 
