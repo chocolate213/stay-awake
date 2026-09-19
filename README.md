@@ -2,6 +2,8 @@
 
 **Keep your Mac awake while local AI agents work.**
 
+[Website](https://chocolate213.github.io/stay-awake/) · [Download](https://github.com/chocolate213/stay-awake/releases/latest)
+
 A native macOS menu bar app powered by the system `caffeinate` command. Prevent idle sleep while your agent codes, tests, or builds, without changing system sleep settings.
 
 ![Stay Awake interface preview: menu bar countdown, a 30-minute extension, and a Keep Awake Until time picker.](docs/images/stay-awake-overview.png)
