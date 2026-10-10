@@ -8,6 +8,7 @@ ditto "$ROOT_DIR/StayAwakeMenu/Resources/en.lproj" "$TEST_DIR/SessionTests.app/C
 ditto "$ROOT_DIR/StayAwakeMenu/Resources/zh-Hans.lproj" "$TEST_DIR/SessionTests.app/Contents/Resources/zh-Hans.lproj"
 xcrun clang -fobjc-arc -Wall -Wextra -Werror -mmacosx-version-min=11.0 \
   -framework AppKit -framework UserNotifications "$ROOT_DIR/tests/session-tests.m" \
+  "$ROOT_DIR/StayAwakeMenu/UpdateRelease.m" \
   -o "$TEST_DIR/SessionTests.app/Contents/MacOS/SessionTests"
 for locale in en zh-Hans; do
   "$TEST_DIR/SessionTests.app/Contents/MacOS/SessionTests" "$ROOT_DIR/StayAwakeMenu/Resources/Scripts/stay-awake" "$locale"

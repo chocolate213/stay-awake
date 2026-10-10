@@ -12,5 +12,6 @@
 10. Extend a timed session by 30 minutes, then stop it. Confirm the countdown changes to `Off`; indefinite sessions must disable the extension action.
 11. Let a 1-minute session expire with the menu open. Confirm the icon returns to off and no expiry notification appears. Check that waking after an expired deadline does not restart the session.
 12. Use `scripts/stay-awake-toggle` to stop a timed session and start an indefinite one. Confirm the menu follows the process and shows `On` instead of the old countdown.
+13. In About, check updates with both a current and an older app version. Confirm the release notes and manual installation steps are readable, the download link opens the correct release, and checking does not change an active session. Test offline failure and closing About during a check, then reopen and retry.
 
 The release build is ad-hoc signed for local distribution. For notarized public distribution, sign with a Developer ID Application certificate and submit the archive to Apple's notarization service.

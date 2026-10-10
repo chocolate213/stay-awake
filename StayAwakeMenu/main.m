@@ -3,6 +3,7 @@
 #import <libproc.h>
 #import <signal.h>
 #import <math.h>
+#import "UpdateRelease.h"
 
 static const CGFloat StatusIconPointSize = 16.0;
 
@@ -130,7 +131,7 @@ static NSString *LocalizedString(NSString *key) {
 }
 @end
 
-@interface StayAwakeApp : NSObject <NSApplicationDelegate, NSMenuDelegate, NSTextFieldDelegate>
+@interface StayAwakeApp : NSObject <NSApplicationDelegate, NSMenuDelegate, NSTextFieldDelegate, NSWindowDelegate>
 @property(nonatomic, strong) NSStatusItem *statusItem;
 @property(nonatomic, strong) NSMenuItem *statusMenuItem;
 @property(nonatomic, strong) NSMenuItem *toggleMenuItem;
@@ -144,6 +145,10 @@ static NSString *LocalizedString(NSString *key) {
 @property(nonatomic, strong) NSDatePicker *untilPicker;
 @property(nonatomic, strong) NSArray<RoundedTimePresetButton *> *untilPresets;
 @property(nonatomic, strong) NSTextField *untilPreview;
+@property(nonatomic, strong) NSWindow *aboutWindow;
+@property(nonatomic, strong) NSButton *checkUpdatesButton;
+@property(nonatomic, strong) NSTextField *updateStatus;
+@property(nonatomic, strong) NSURLSession *updateSession;
 @end
 
 @implementation StayAwakeApp
@@ -203,6 +208,7 @@ static NSString *LocalizedString(NSString *key) {
 }
 
 - (void)applicationWillTerminate:(NSNotification *)notification {
+    [self.updateSession invalidateAndCancel];
     [self.refreshTimer invalidate];
     [self stopStayAwake];
 }
@@ -422,20 +428,170 @@ static NSString *LocalizedString(NSString *key) {
     [NSApp terminate:nil];
 }
 
-- (void)presentStayAwakeAboutPanel:(id)sender {
-    NSString *credits = LocalizedString(@"about.credits");
-    NSString *applicationVersion = [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"1.0.4";
-    NSImage *icon = [self applicationIcon] ?: NSApp.applicationIconImage;
-    NSDictionary *options = @{
-        NSAboutPanelOptionApplicationName: LocalizedString(@"app.name"),
-        NSAboutPanelOptionApplicationVersion: applicationVersion,
-        NSAboutPanelOptionVersion: @"",
-        NSAboutPanelOptionApplicationIcon: icon ?: [[NSImage alloc] init],
-        NSAboutPanelOptionCredits: [[NSAttributedString alloc] initWithString:credits]
-    };
+- (NSString *)applicationVersion {
+    return [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"0";
+}
 
+- (NSTextField *)aboutLabel:(NSString *)text frame:(NSRect)frame font:(NSFont *)font {
+    NSTextField *label = [NSTextField wrappingLabelWithString:text];
+    label.frame = frame;
+    label.font = font;
+    label.alignment = NSTextAlignmentCenter;
+    [self.aboutWindow.contentView addSubview:label];
+    return label;
+}
+
+- (void)setUpdateStatusText:(NSString *)text {
+    NSString *link = LocalizedString(@"about.website");
+    NSMutableParagraphStyle *paragraph = [NSMutableParagraphStyle new];
+    paragraph.alignment = NSTextAlignmentCenter;
+    NSMutableAttributedString *status = [[NSMutableAttributedString alloc]
+        initWithString:[text stringByAppendingFormat:@" %@", link] attributes:@{
+            NSFontAttributeName: [NSFont systemFontOfSize:11],
+            NSForegroundColorAttributeName: NSColor.secondaryLabelColor,
+            NSParagraphStyleAttributeName: paragraph
+        }];
+    [status addAttributes:@{
+        NSLinkAttributeName: [NSURL URLWithString:@"https://chocolate213.github.io/stay-awake/"],
+        NSForegroundColorAttributeName: NSColor.linkColor,
+        NSUnderlineStyleAttributeName: @(NSUnderlineStyleSingle)
+    } range:NSMakeRange(text.length + 1, link.length)];
+    self.updateStatus.attributedStringValue = status;
+}
+
+- (void)presentStayAwakeAboutPanel:(id)sender {
+    (void)sender;
+    if (!self.aboutWindow) {
+        self.aboutWindow = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, 420, 270)
+            styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable
+            backing:NSBackingStoreBuffered defer:NO];
+        self.aboutWindow.title = LocalizedString(@"menu.about");
+        self.aboutWindow.releasedWhenClosed = NO;
+        self.aboutWindow.delegate = self;
+        NSImageView *icon = [[NSImageView alloc] initWithFrame:NSMakeRect(178, 188, 64, 64)];
+        icon.image = [self applicationIcon] ?: NSApp.applicationIconImage;
+        icon.imageScaling = NSImageScaleProportionallyUpOrDown;
+        [self.aboutWindow.contentView addSubview:icon];
+        [self aboutLabel:LocalizedString(@"app.name") frame:NSMakeRect(20, 157, 380, 26)
+            font:[NSFont boldSystemFontOfSize:20]];
+        NSTextField *version = [self aboutLabel:[NSString stringWithFormat:LocalizedString(@"about.version"), [self applicationVersion]]
+            frame:NSMakeRect(20, 133, 380, 20) font:[NSFont systemFontOfSize:12]];
+        version.textColor = NSColor.secondaryLabelColor;
+        [self aboutLabel:LocalizedString(@"about.credits") frame:NSMakeRect(36, 99, 348, 20)
+            font:[NSFont systemFontOfSize:13]];
+        self.checkUpdatesButton = [NSButton buttonWithTitle:LocalizedString(@"updates.check")
+            target:self action:@selector(checkForUpdates:)];
+        self.checkUpdatesButton.frame = NSMakeRect(105, 51, 210, 32);
+        [self.aboutWindow.contentView addSubview:self.checkUpdatesButton];
+        self.updateStatus = [self aboutLabel:@"" frame:NSMakeRect(20, 21, 380, 20)
+            font:[NSFont systemFontOfSize:11]];
+        self.updateStatus.selectable = YES;
+        self.updateStatus.allowsEditingTextAttributes = YES;
+        [self setUpdateStatusText:LocalizedString(@"updates.manual")];
+        [self.aboutWindow center];
+    }
     [NSApp activateIgnoringOtherApps:YES];
-    [NSApp orderFrontStandardAboutPanelWithOptions:options];
+    [self.aboutWindow makeKeyAndOrderFront:nil];
+}
+
+- (void)windowWillClose:(NSNotification *)notification {
+    if (notification.object == self.aboutWindow) {
+        [self.updateSession invalidateAndCancel];
+        self.updateSession = nil;
+        self.checkUpdatesButton.enabled = YES;
+        self.checkUpdatesButton.title = LocalizedString(@"updates.check");
+        [self setUpdateStatusText:LocalizedString(@"updates.manual")];
+    }
+}
+
+- (void)presentUpdateAlert:(NSAlert *)alert destination:(NSURL *)destination {
+    [alert beginSheetModalForWindow:self.aboutWindow completionHandler:^(NSModalResponse response) {
+        if (destination && response == NSAlertFirstButtonReturn) {
+            [NSWorkspace.sharedWorkspace openURL:destination];
+        }
+    }];
+}
+
+- (void)showUpdateRelease:(UpdateRelease *)release failureKey:(NSString *)failureKey {
+    NSComparisonResult comparison = NSOrderedSame;
+    if (release && !CompareUpdateVersions(release.version, [self applicationVersion], &comparison)) {
+        failureKey = @"updates.error.invalid";
+        release = nil;
+    }
+    NSAlert *alert = [NSAlert new];
+    if (!release) {
+        alert.alertStyle = NSAlertStyleWarning;
+        alert.messageText = LocalizedString(@"updates.error.title");
+        alert.informativeText = LocalizedString(failureKey ?: @"updates.error.invalid");
+        [alert addButtonWithTitle:LocalizedString(@"updates.viewReleases")];
+        [alert addButtonWithTitle:LocalizedString(@"updates.close")];
+        [self presentUpdateAlert:alert destination:[NSURL URLWithString:@"https://github.com/chocolate213/stay-awake/releases"]];
+    } else if (comparison != NSOrderedDescending) {
+        alert.messageText = LocalizedString(@"updates.current.title");
+        alert.informativeText = [NSString stringWithFormat:LocalizedString(@"updates.current.detail"),
+            [self applicationVersion], release.version];
+        [alert addButtonWithTitle:LocalizedString(@"updates.close")];
+        [self presentUpdateAlert:alert destination:nil];
+    } else {
+        alert.messageText = [NSString stringWithFormat:LocalizedString(@"updates.available.title"), release.version];
+        alert.informativeText = [NSString stringWithFormat:LocalizedString(@"updates.available.detail"), [self applicationVersion]];
+        NSScrollView *scroll = [[NSScrollView alloc] initWithFrame:NSMakeRect(0, 0, 360, 140)];
+        scroll.hasVerticalScroller = YES;
+        scroll.borderType = NSBezelBorder;
+        NSTextView *notes = [[NSTextView alloc] initWithFrame:scroll.bounds];
+        notes.editable = NO;
+        notes.font = [NSFont systemFontOfSize:12];
+        notes.textColor = NSColor.labelColor;
+        notes.backgroundColor = NSColor.textBackgroundColor;
+        notes.textContainerInset = NSMakeSize(8, 8);
+        notes.autoresizingMask = NSViewWidthSizable;
+        notes.textContainer.widthTracksTextView = YES;
+        notes.string = release.notes.length ? release.notes : LocalizedString(@"updates.notes.empty");
+        scroll.documentView = notes;
+        alert.accessoryView = scroll;
+        [alert addButtonWithTitle:LocalizedString(@"updates.download")];
+        [alert addButtonWithTitle:LocalizedString(@"updates.later")];
+        [self presentUpdateAlert:alert destination:release.pageURL];
+    }
+}
+
+- (NSURLSessionConfiguration *)updateSessionConfiguration {
+    NSURLSessionConfiguration *configuration = NSURLSessionConfiguration.ephemeralSessionConfiguration;
+    configuration.timeoutIntervalForRequest = 15;
+    configuration.timeoutIntervalForResource = 30;
+    return configuration;
+}
+
+- (void)checkForUpdates:(id)sender {
+    (void)sender;
+    if (self.updateSession) return;
+    self.checkUpdatesButton.enabled = NO;
+    self.checkUpdatesButton.title = LocalizedString(@"updates.checking");
+    [self setUpdateStatusText:LocalizedString(@"updates.connecting")];
+    NSURLSessionConfiguration *configuration = [self updateSessionConfiguration];
+    NSURLSession *session = [NSURLSession sessionWithConfiguration:configuration];
+    self.updateSession = session;
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:
+        [NSURL URLWithString:@"https://api.github.com/repos/chocolate213/stay-awake/releases/latest"]];
+    [request setValue:@"application/vnd.github+json" forHTTPHeaderField:@"Accept"];
+    [request setValue:@"2022-11-28" forHTTPHeaderField:@"X-GitHub-Api-Version"];
+    [request setValue:@"Stay-Awake-Update-Check" forHTTPHeaderField:@"User-Agent"];
+    __weak StayAwakeApp *weakSelf = self;
+    [[session dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+        NSString *failureKey = nil;
+        UpdateRelease *release = [UpdateRelease releaseFromData:data response:response networkError:error failureKey:&failureKey];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            StayAwakeApp *app = weakSelf;
+            // Ignore cancelled checks, including a window closed and reopened during the request.
+            if (!app || app.updateSession != session) return;
+            [session finishTasksAndInvalidate];
+            app.updateSession = nil;
+            app.checkUpdatesButton.enabled = YES;
+            app.checkUpdatesButton.title = LocalizedString(@"updates.check");
+            [app setUpdateStatusText:LocalizedString(@"updates.manual")];
+            [app showUpdateRelease:release failureKey:failureKey];
+        });
+    }] resume];
 }
 
 - (void)startPreset:(NSMenuItem *)sender {

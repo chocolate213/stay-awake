@@ -14,11 +14,13 @@ run: install
 	open "$(INSTALL_PATH)"
 
 test:
+	bash tests/update-tests.sh
 	bash tests/stay-awake-helper-tests.sh
 	bash tests/menu-source-tests.sh
 	bash tests/session-tests.sh
 
 verify: build
+	bash tests/update-tests.sh
 	bash tests/stay-awake-helper-tests.sh
 	bash tests/menu-source-tests.sh
 	bash tests/session-tests.sh

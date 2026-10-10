@@ -21,7 +21,28 @@
 "alert.startFailed.title" = "Cannot turn Stay Awake on";
 "alert.unknownError" = "Unknown error";
 
-"about.credits" = "A tiny native macOS menu bar app that installs a local helper script and controls the system caffeinate command.";
+"about.credits" = "Keep your Mac awake while local AI agents work.";
+"about.version" = "Version %@";
+"about.website" = "Website";
+
+"updates.check" = "Check for Updates…";
+"updates.checking" = "Checking…";
+"updates.connecting" = "Connecting to GitHub…";
+"updates.manual" = "Updates are installed manually.";
+"updates.error.title" = "Couldn’t check for updates";
+"updates.error.network" = "Check your internet connection and try again. You can also view releases on GitHub.";
+"updates.error.rateLimit" = "GitHub is limiting requests. Try again later, or view releases on GitHub.";
+"updates.error.server" = "GitHub couldn’t provide the latest release. Try again later, or view releases on GitHub.";
+"updates.error.invalid" = "The release information couldn’t be verified. You can view releases on GitHub instead.";
+"updates.viewReleases" = "View Releases";
+"updates.close" = "OK";
+"updates.current.title" = "No newer release available";
+"updates.current.detail" = "Your version: %@\nLatest release: %@";
+"updates.available.title" = "Stay Awake %@ is available";
+"updates.available.detail" = "Your version: %@\n\nTo upgrade:\n1. Download and unzip the latest release.\n2. Quit Stay Awake (this ends your awake session).\n3. Replace Stay Awake.app in its existing installation folder, then reopen it.";
+"updates.notes.empty" = "See the GitHub release page for details.";
+"updates.download" = "Open Download Page";
+"updates.later" = "Later";
 
 "menu.duration" = "Keep Awake For";
 "menu.extend" = "Extend by 30 Minutes";

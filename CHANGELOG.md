@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.2
+
+- Add Check for Updates to About, with release notes, a download-page link, and manual upgrade instructions.
+- Handle unavailable networks and GitHub rate limits without interrupting the current awake session.
+- Refine the About layout and add a website text link beside the manual-update note.
+
 ## 1.1.1
 
 - Add 18:00, 19:00, 20:00, and 21:00 shortcuts to Keep Awake Until. Select a time, then press Start to begin the session.

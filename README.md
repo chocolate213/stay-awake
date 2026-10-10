@@ -32,6 +32,8 @@ Click the moon, then choose **Keep Awake For**, **Keep Awake Until**, or **Turn 
 
 Scroll over a custom hours/minutes field to adjust it. For Keep Awake Until, select the time segment first, then scroll. Cancel preserves the current session.
 
+Choose **About Stay Awake → Check for Updates…** to check GitHub releases. To upgrade, download and unzip the app, quit Stay Awake, replace it in its existing installation folder, and reopen it.
+
 Keep your MacBook's lid open. Stay Awake prevents idle sleep; it does not run agents or bypass their approvals or usage limits. It does not launch at login unless you add it to Login Items.
 
 ## For AI Agents

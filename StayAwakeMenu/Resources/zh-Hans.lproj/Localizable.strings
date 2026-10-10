@@ -21,7 +21,28 @@
 "alert.startFailed.title" = "开启失败";
 "alert.unknownError" = "未知错误";
 
-"about.credits" = "原生 macOS 菜单栏小工具，会安装本地辅助脚本并控制系统 caffeinate 命令。";
+"about.credits" = "让 Mac 保持唤醒，供本地 AI Agent 持续工作。";
+"about.version" = "版本 %@";
+"about.website" = "访问主页";
+
+"updates.check" = "检查更新…";
+"updates.checking" = "正在检查…";
+"updates.connecting" = "正在连接 GitHub…";
+"updates.manual" = "更新需手动安装。";
+"updates.error.title" = "无法检查更新";
+"updates.error.network" = "请检查网络连接后重试，也可以在 GitHub 上查看发布版本。";
+"updates.error.rateLimit" = "GitHub 暂时限制了请求，请稍后重试，或在 GitHub 上查看发布版本。";
+"updates.error.server" = "暂时无法从 GitHub 获取最新版本，请稍后重试，或在 GitHub 上查看发布版本。";
+"updates.error.invalid" = "无法验证发布版本信息，请前往 GitHub 查看发布版本。";
+"updates.viewReleases" = "查看发布版本";
+"updates.close" = "好";
+"updates.current.title" = "暂无更新版本";
+"updates.current.detail" = "当前版本：%@\n最新发布版本：%@";
+"updates.available.title" = "保持唤醒 %@ 已发布";
+"updates.available.detail" = "当前版本：%@\n\n升级步骤：\n1. 下载并解压最新发布版本。\n2. 退出保持唤醒（会结束当前唤醒会话）。\n3. 在原安装目录中替换 Stay Awake.app，然后重新打开。";
+"updates.notes.empty" = "详情请查看 GitHub 发布页面。";
+"updates.download" = "打开下载页面";
+"updates.later" = "稍后";
 
 "menu.duration" = "保持唤醒时长";
 "menu.extend" = "延长 30 分钟";

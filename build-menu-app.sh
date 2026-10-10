@@ -35,6 +35,7 @@ xcrun clang \
   -framework AppKit \
   -framework UserNotifications \
   "$ROOT_DIR/StayAwakeMenu/main.m" \
+  "$ROOT_DIR/StayAwakeMenu/UpdateRelease.m" \
   -o "$MACOS_DIR/StayAwakeMenu"
 
 cp "$ROOT_DIR/StayAwakeMenu/Info.plist" "$CONTENTS_DIR/Info.plist"

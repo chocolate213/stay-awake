@@ -3,6 +3,35 @@
 #import "../StayAwakeMenu/main.m"
 #undef main
 
+// Exercise the real async update path without depending on GitHub availability.
+static BOOL HoldUpdateResponse;
+static NSInteger UpdateHTTPStatus = 200;
+static NSError *UpdateNetworkError;
+static NSString *UpdateTag = @"v1.2.0";
+@interface TestUpdateProtocol : NSURLProtocol
+@end
+@implementation TestUpdateProtocol
++ (BOOL)canInitWithRequest:(NSURLRequest *)request {
+    return [request.URL.absoluteString isEqualToString:@"https://api.github.com/repos/chocolate213/stay-awake/releases/latest"];
+}
++ (NSURLRequest *)canonicalRequestForRequest:(NSURLRequest *)request { return request; }
+- (void)startLoading {
+    if (HoldUpdateResponse) return;
+    if (UpdateNetworkError) {
+        [self.client URLProtocol:self didFailWithError:UpdateNetworkError];
+        return;
+    }
+    NSHTTPURLResponse *response = [[NSHTTPURLResponse alloc] initWithURL:self.request.URL
+        statusCode:UpdateHTTPStatus HTTPVersion:@"HTTP/1.1" headerFields:nil];
+    NSData *data = [NSJSONSerialization dataWithJSONObject:@{@"tag_name": UpdateTag,
+        @"draft": @NO, @"prerelease": @NO, @"body": @"Test release notes"} options:0 error:NULL];
+    [self.client URLProtocol:self didReceiveResponse:response cacheStoragePolicy:NSURLCacheStorageNotAllowed];
+    [self.client URLProtocol:self didLoadData:data];
+    [self.client URLProtocolDidFinishLoading:self];
+}
+- (void)stopLoading {}
+@end
+
 @interface TestScrollEvent : NSEvent
 @property(nonatomic) CGFloat testDelta;
 @property(nonatomic) BOOL precise;
@@ -20,10 +49,22 @@
 @property(nonatomic, strong) NSURL *helperSource;
 @property(nonatomic) NSUInteger notificationCount;
 @property(nonatomic) NSUInteger alertCount;
+@property(nonatomic, strong) NSAlert *updateAlert;
+@property(nonatomic, strong) NSURL *updateDestination;
 @end
 @implementation TestApp
 - (NSURL *)applicationSupportDirectory { return self.testRoot; }
 - (NSURL *)bundledHelperURL { return self.helperSource; }
+- (NSString *)applicationVersion { return @"1.1.1"; }
+- (NSURLSessionConfiguration *)updateSessionConfiguration {
+    NSURLSessionConfiguration *configuration = [super updateSessionConfiguration];
+    configuration.protocolClasses = @[TestUpdateProtocol.class];
+    return configuration;
+}
+- (void)presentUpdateAlert:(NSAlert *)alert destination:(NSURL *)destination {
+    self.updateAlert = alert;
+    self.updateDestination = destination;
+}
 - (void)showNotification:(NSString *)message { (void)message; self.notificationCount++; }
 - (void)showAlert:(NSString *)message detail:(NSString *)detail {
     (void)message; (void)detail; self.alertCount++;
@@ -50,6 +91,45 @@ int main(int argc, const char *argv[]) {
         app.testRoot = [NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:NSUUID.UUID.UUIDString] isDirectory:YES];
         app.helperSource = [NSURL fileURLWithPath:@(argv[1])];
         @try {
+            [app presentStayAwakeAboutPanel:nil];
+            NSWindow *about = app.aboutWindow;
+            [app presentStayAwakeAboutPanel:nil];
+            Check(app.aboutWindow == about && !app.updateSession, @"About reuses its window and does not check automatically");
+            [app checkForUpdates:nil];
+            NSURLSession *firstCheck = app.updateSession;
+            [app checkForUpdates:nil];
+            Check(firstCheck && app.updateSession == firstCheck && !app.checkUpdatesButton.enabled, @"duplicate checks suppressed");
+            Pump(0.5);
+            Check(!app.updateSession && app.checkUpdatesButton.enabled, @"successful check resets loading state");
+            Check(app.updateDestination && app.updateAlert.accessoryView &&
+                [app.updateAlert.messageText containsString:@"1.2.0"], @"new release offers download page and notes");
+            for (NSString *tag in @[@"v1.1.1", @"v1.0.4"]) {
+                UpdateTag = tag;
+                [app checkForUpdates:nil]; Pump(0.5);
+                Check(!app.updateDestination && !app.updateAlert.accessoryView &&
+                    [app.updateAlert.messageText isEqualToString:LocalizedString(@"updates.current.title")], @"same or older release offers no downgrade");
+            }
+            UpdateHTTPStatus = 429;
+            [app checkForUpdates:nil]; Pump(0.5);
+            Check([app.updateAlert.informativeText isEqualToString:LocalizedString(@"updates.error.rateLimit")] &&
+                app.updateDestination && app.checkUpdatesButton.enabled, @"rate limit recovers and offers releases page");
+            UpdateHTTPStatus = 200;
+            UpdateNetworkError = [NSError errorWithDomain:NSURLErrorDomain code:NSURLErrorNotConnectedToInternet userInfo:nil];
+            [app checkForUpdates:nil]; Pump(0.5);
+            Check([app.updateAlert.informativeText isEqualToString:LocalizedString(@"updates.error.network")] &&
+                app.checkUpdatesButton.enabled, @"offline check shows actionable localized error");
+            UpdateNetworkError = nil;
+            HoldUpdateResponse = YES;
+            app.updateAlert = nil;
+            [app checkForUpdates:nil];
+            [app.aboutWindow close]; Pump(0.1);
+            Check(!app.updateSession && !app.updateAlert && app.checkUpdatesButton.enabled, @"closing About cancels check without a late alert");
+            HoldUpdateResponse = NO;
+            UpdateTag = @"v1.2.0";
+            [app presentStayAwakeAboutPanel:nil];
+            [app checkForUpdates:nil]; Pump(0.5);
+            Check(app.updateDestination && app.checkUpdatesButton.enabled, @"reopened About can retry");
+            [app.aboutWindow close];
             NSCalendar *calendar = [[NSCalendar alloc] initWithCalendarIdentifier:NSCalendarIdentifierGregorian];
             calendar.timeZone = [NSTimeZone timeZoneForSecondsFromGMT:0];
             NSDateComponents *base = [NSDateComponents new];
@@ -138,6 +218,12 @@ int main(int argc, const char *argv[]) {
             [app refreshStatus];
             Check(app.statusItem.button.title.length > 0 && app.extendMenuItem.enabled, @"timed session displays countdown and enables extension");
             Check([app activeDeadline].timeIntervalSinceNow > 1, @"deadline available immediately");
+            NSDate *deadlineBeforeCheck = [app activeDeadline];
+            [app presentStayAwakeAboutPanel:nil];
+            [app checkForUpdates:nil]; Pump(0.5);
+            Check(app.startedTask == first && first.running && [[app activeDeadline] isEqualToDate:deadlineBeforeCheck],
+                @"checking updates preserves the active session and deadline");
+            [app.aboutWindow close];
             NSDate *oldDeadline = [app activeDeadline];
             [app extendSession:nil];
             NSTask *extended = app.startedTask;
