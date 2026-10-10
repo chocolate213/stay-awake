@@ -46,6 +46,7 @@
 "duration.hour" = "%ld hour";
 
 "until.title" = "Keep Awake Until…";
+"until.preset.accessibility" = "Set time to %@";
 "until.help" = "Choose a time. A time that has already passed means tomorrow.";
 "until.today" = "Today";
 "until.tomorrow" = "Tomorrow";

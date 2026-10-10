@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.1
+
+- Add 18:00, 19:00, 20:00, and 21:00 shortcuts to Keep Awake Until. Select a time, then press Start to begin the session.
+- Highlight the selected shortcut with the system accent color and keep it in sync with manual time changes.
+- Use separate rounded time buttons and improve spacing around the picker and remaining-time preview.
+
 ## 1.1.0
 
 - Remove the developer-facing Reveal Installed Helper menu item.

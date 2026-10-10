@@ -46,6 +46,7 @@
 "duration.hour" = "%ld 小时";
 
 "until.title" = "保持唤醒至…";
+"until.preset.accessibility" = "将时间设为 %@";
 "until.help" = "选择结束时间。已经过去的时间将设为明天。";
 "until.today" = "今天";
 "until.tomorrow" = "明天";

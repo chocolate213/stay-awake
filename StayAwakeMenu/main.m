@@ -56,6 +56,33 @@ static NSString *LocalizedString(NSString *key) {
 }
 @end
 
+@interface RoundedTimePresetButton : NSButton
+@property(nonatomic) BOOL presetSelected;
+@end
+@implementation RoundedTimePresetButton
+- (void)setPresetSelected:(BOOL)selected {
+    _presetSelected = selected;
+    NSMutableParagraphStyle *paragraph = [NSMutableParagraphStyle new];
+    paragraph.alignment = NSTextAlignmentCenter;
+    self.attributedTitle = [[NSAttributedString alloc] initWithString:self.title attributes:@{
+        NSFontAttributeName: self.font,
+        NSForegroundColorAttributeName: selected ? NSColor.whiteColor : NSColor.labelColor,
+        NSParagraphStyleAttributeName: paragraph
+    }];
+    self.needsDisplay = YES;
+}
+- (void)drawRect:(NSRect)dirtyRect {
+    BOOL selected = self.presetSelected;
+    NSBezierPath *shape = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(self.bounds, 0.5, 0.5) xRadius:11 yRadius:11];
+    [(selected ? NSColor.controlAccentColor : NSColor.controlBackgroundColor) setFill];
+    [shape fill];
+    [(selected ? NSColor.controlAccentColor : NSColor.separatorColor) setStroke];
+    shape.lineWidth = 0.5;
+    [shape stroke];
+    [super drawRect:dirtyRect];
+}
+@end
+
 @interface ScrollableDurationField : NSTextField
 @property(nonatomic, strong) TimeScrollAccumulator *scrollAccumulator;
 @end
@@ -115,6 +142,7 @@ static NSString *LocalizedString(NSString *key) {
 @property(nonatomic, strong) NSMenuItem *quitMenuItem;
 @property(nonatomic, strong) NSTimer *refreshTimer;
 @property(nonatomic, strong) NSDatePicker *untilPicker;
+@property(nonatomic, strong) NSArray<RoundedTimePresetButton *> *untilPresets;
 @property(nonatomic, strong) NSTextField *untilPreview;
 @end
 
@@ -434,12 +462,26 @@ static NSString *LocalizedString(NSString *key) {
     NSString *day = LocalizedString([NSCalendar.currentCalendar isDate:deadline inSameDayAsDate:now] ? @"until.today" : @"until.tomorrow");
     NSString *time = [NSDateFormatter localizedStringFromDate:deadline dateStyle:NSDateFormatterNoStyle timeStyle:NSDateFormatterShortStyle];
     self.untilPreview.stringValue = [NSString stringWithFormat:LocalizedString(@"until.preview"), day, time, [self countdownForSeconds:[deadline timeIntervalSinceDate:now]]];
+    NSDateComponents *parts = [NSCalendar.currentCalendar components:NSCalendarUnitHour | NSCalendarUnitMinute fromDate:self.untilPicker.dateValue];
+    for (RoundedTimePresetButton *button in self.untilPresets) {
+        BOOL selected = parts.minute == 0 && parts.hour == button.tag;
+        if (button.presetSelected != selected) {
+            button.presetSelected = selected;
+            button.needsDisplay = YES;
+        }
+    }
 }
 
-- (NSView *)timeSelectionViewWithHelp:(NSString *)help {
-    NSView *view = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 340, 194)];
+- (void)selectUntilPreset:(NSButton *)sender {
+    [self.untilPicker.window makeFirstResponder:nil];
+    self.untilPicker.dateValue = [NSCalendar.currentCalendar dateBySettingHour:sender.tag minute:0 second:0 ofDate:NSDate.date options:0];
+    [self updateUntilPreview:nil];
+}
+
+- (NSView *)timeSelectionViewWithHelp:(NSString *)help height:(CGFloat)height {
+    NSView *view = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 340, height)];
     NSTextField *label = [NSTextField wrappingLabelWithString:help];
-    label.frame = NSMakeRect(0, 150, 340, 44);
+    label.frame = NSMakeRect(0, height - 44, 340, 44);
     [view addSubview:label];
     return view;
 }
@@ -451,7 +493,7 @@ static NSString *LocalizedString(NSString *key) {
 
     [alert addButtonWithTitle:LocalizedString(@"duration.start")];
     [alert addButtonWithTitle:LocalizedString(@"duration.cancel")];
-    NSView *view = [self timeSelectionViewWithHelp:LocalizedString(@"until.help")];
+    NSView *view = [self timeSelectionViewWithHelp:LocalizedString(@"until.help") height:218];
     self.untilPicker = [[ScrollableTimePicker alloc] initWithFrame:NSMakeRect(0, 52, 180, 28)];
     self.untilPicker.datePickerStyle = NSDatePickerStyleTextField;
     self.untilPicker.font = [NSFont monospacedDigitSystemFontOfSize:44 weight:NSFontWeightLight];
@@ -461,11 +503,28 @@ static NSString *LocalizedString(NSString *key) {
     self.untilPicker.datePickerElements = NSDatePickerElementFlagHourMinute;
     self.untilPicker.dateValue = [NSDate dateWithTimeIntervalSinceNow:3600];
     [self.untilPicker sizeToFit];
-    [self.untilPicker setFrameOrigin:NSMakePoint((340 - self.untilPicker.frame.size.width) / 2, 62)];
+    [self.untilPicker setFrameOrigin:NSMakePoint((340 - self.untilPicker.frame.size.width) / 2, 110)];
     self.untilPicker.accessibilityLabel = LocalizedString(@"until.title");
     self.untilPicker.target = self;
     self.untilPicker.action = @selector(updateUntilPreview:);
     [view addSubview:self.untilPicker];
+    NSMutableArray<RoundedTimePresetButton *> *presets = [NSMutableArray array];
+    for (NSInteger index = 0; index < 4; index++) {
+        NSString *title = [NSString stringWithFormat:@"%ld:00", (long)(18 + index)];
+        RoundedTimePresetButton *button = [[RoundedTimePresetButton alloc] initWithFrame:NSMakeRect(6 + index * 84, 64, 76, 30)];
+        button.title = title;
+        button.bordered = NO;
+        button.buttonType = NSButtonTypeMomentaryChange;
+        button.font = [NSFont monospacedDigitSystemFontOfSize:13 weight:NSFontWeightMedium];
+        button.presetSelected = NO;
+        button.tag = 18 + index;
+        button.target = self;
+        button.action = @selector(selectUntilPreset:);
+        button.accessibilityLabel = [NSString stringWithFormat:LocalizedString(@"until.preset.accessibility"), title];
+        [presets addObject:button];
+        [view addSubview:button];
+    }
+    self.untilPresets = presets;
     self.untilPreview = [NSTextField wrappingLabelWithString:@""];
     self.untilPreview.frame = NSMakeRect(0, 0, 340, 44);
     self.untilPreview.textColor = NSColor.secondaryLabelColor;
@@ -486,6 +545,7 @@ static NSString *LocalizedString(NSString *key) {
         [self replaceSessionWithSeconds:[deadline timeIntervalSinceDate:now]];
     }
     self.untilPicker = nil;
+    self.untilPresets = nil;
     self.untilPreview = nil;
 }
 
@@ -564,7 +624,7 @@ static NSString *LocalizedString(NSString *key) {
 
     [alert addButtonWithTitle:LocalizedString(@"duration.start")];
     [alert addButtonWithTitle:LocalizedString(@"duration.cancel")];
-    NSView *view = [self timeSelectionViewWithHelp:LocalizedString(@"duration.picker.help")];
+    NSView *view = [self timeSelectionViewWithHelp:LocalizedString(@"duration.picker.help") height:194];
     NSTextField *hours = [self addDurationFieldToView:view x:20 tag:1 label:LocalizedString(@"duration.hours.label") maximum:168 value:1];
     NSTextField *minutes = [self addDurationFieldToView:view x:190 tag:2 label:LocalizedString(@"duration.minutes.label") maximum:59 value:30];
     alert.accessoryView = view;
