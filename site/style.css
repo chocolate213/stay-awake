@@ -1201,6 +1201,18 @@ h2>span:not(.gradient-text) {
   margin-top:18px;
   color:#596d8d;
 }
+.install-heading>p.release-note {
+  font-size:12px;
+  margin-top:20px;
+}
+.release-note a {
+  color:#b3caff;
+  text-decoration:underline;
+  text-underline-offset:3px;
+}
+.release-note a:hover {
+  color:#fff;
+}
 .install-grid {
   display:grid;
   grid-template-columns:1fr 1fr;
