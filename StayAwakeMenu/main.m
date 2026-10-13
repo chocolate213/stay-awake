@@ -133,6 +133,8 @@ static NSString *LocalizedString(NSString *key) {
 
 @interface StayAwakeApp : NSObject <NSApplicationDelegate, NSMenuDelegate, NSTextFieldDelegate, NSWindowDelegate>
 @property(nonatomic, strong) NSStatusItem *statusItem;
+@property(nonatomic, strong) NSImage *runningStatusImage;
+@property(nonatomic, strong) NSImage *stoppedStatusImage;
 @property(nonatomic, strong) NSMenuItem *statusMenuItem;
 @property(nonatomic, strong) NSMenuItem *toggleMenuItem;
 @property(nonatomic, strong) NSMenuItem *durationMenuItem;
@@ -298,18 +300,20 @@ static NSString *LocalizedString(NSString *key) {
 }
 
 - (NSImage *)statusBarImageForRunning:(BOOL)isRunning {
+    NSImage *cachedImage = isRunning ? self.runningStatusImage : self.stoppedStatusImage;
+    if (cachedImage) return cachedImage;
+    NSImage *image = nil;
     if (@available(macOS 11.0, *)) {
         NSString *symbolName = isRunning ? @"moon.stars.fill" : @"moon.zzz.fill";
-        NSImage *image = [NSImage imageWithSystemSymbolName:symbolName accessibilityDescription:LocalizedString(@"app.name")];
+        image = [NSImage imageWithSystemSymbolName:symbolName accessibilityDescription:LocalizedString(@"app.name")];
         NSImageSymbolConfiguration *configuration = [NSImageSymbolConfiguration configurationWithPointSize:StatusIconPointSize weight:NSFontWeightRegular scale:NSImageSymbolScaleMedium];
         image = [image imageWithSymbolConfiguration:configuration] ?: image;
-        image.template = YES;
-        return image;
     }
-
-    NSImage *fallback = [NSImage imageNamed:NSImageNameActionTemplate];
-    fallback.template = YES;
-    return fallback;
+    image = image ?: [NSImage imageNamed:NSImageNameActionTemplate];
+    image.template = YES;
+    if (isRunning) self.runningStatusImage = image;
+    else self.stoppedStatusImage = image;
+    return image;
 }
 
 - (void)menuNeedsUpdate:(NSMenu *)menu {
@@ -317,12 +321,14 @@ static NSString *LocalizedString(NSString *key) {
 }
 
 - (void)updateLocalizedMenuText {
-    self.aboutMenuItem.title = LocalizedString(@"menu.about");
-    self.aboutMenuItem.image = nil;
-    self.aboutMenuItem.state = NSControlStateValueOff;
-    self.quitMenuItem.title = LocalizedString(@"menu.quit");
-    self.quitMenuItem.image = nil;
-    self.quitMenuItem.state = NSControlStateValueOff;
+    NSString *aboutTitle = LocalizedString(@"menu.about");
+    if (![self.aboutMenuItem.title isEqualToString:aboutTitle]) self.aboutMenuItem.title = aboutTitle;
+    if (self.aboutMenuItem.image) self.aboutMenuItem.image = nil;
+    if (self.aboutMenuItem.state != NSControlStateValueOff) self.aboutMenuItem.state = NSControlStateValueOff;
+    NSString *quitTitle = LocalizedString(@"menu.quit");
+    if (![self.quitMenuItem.title isEqualToString:quitTitle]) self.quitMenuItem.title = quitTitle;
+    if (self.quitMenuItem.image) self.quitMenuItem.image = nil;
+    if (self.quitMenuItem.state != NSControlStateValueOff) self.quitMenuItem.state = NSControlStateValueOff;
 }
 
 - (void)workspaceDidWake:(NSNotification *)notification {
@@ -361,30 +367,35 @@ static NSString *LocalizedString(NSString *key) {
 }
 
 - (void)applyStatusPresentationForRunning:(BOOL)isRunning {
-    self.statusMenuItem.title = isRunning ? LocalizedString(@"menu.status.on") : LocalizedString(@"menu.status.off");
-    self.statusMenuItem.state = NSControlStateValueOff;
-    self.toggleMenuItem.title = isRunning ? LocalizedString(@"menu.toggle.off") : LocalizedString(@"menu.toggle.on");
-    self.toggleMenuItem.image = nil;
+    NSString *toggleTitle = LocalizedString(isRunning ? @"menu.toggle.off" : @"menu.toggle.on");
+    if (![self.toggleMenuItem.title isEqualToString:toggleTitle]) self.toggleMenuItem.title = toggleTitle;
+    if (self.toggleMenuItem.image) self.toggleMenuItem.image = nil;
     // This item names an action; current status is shown separately.
-    self.toggleMenuItem.state = NSControlStateValueOff;
+    if (self.toggleMenuItem.state != NSControlStateValueOff) self.toggleMenuItem.state = NSControlStateValueOff;
 
     NSStatusBarButton *button = self.statusItem.button;
-    button.image = [self statusBarImageForRunning:isRunning];
+    NSImage *image = [self statusBarImageForRunning:isRunning];
+    if (button.image != image) button.image = image;
     NSDate *deadline = isRunning ? [self activeDeadline] : nil;
     NSString *statusText = deadline ? [self countdownForSeconds:MAX(0, deadline.timeIntervalSinceNow)] : LocalizedString(@"countdown.indefinite");
-    button.title = [@" " stringByAppendingString:isRunning ? statusText : LocalizedString(@"countdown.off")];
-    self.extendMenuItem.enabled = isRunning && deadline != nil && deadline.timeIntervalSinceNow > 0;
+    NSString *buttonTitle = [@" " stringByAppendingString:isRunning ? statusText : LocalizedString(@"countdown.off")];
+    if (![button.title isEqualToString:buttonTitle]) button.title = buttonTitle;
+    BOOL canExtend = isRunning && deadline != nil && deadline.timeIntervalSinceNow > 0;
+    if (self.extendMenuItem.enabled != canExtend) self.extendMenuItem.enabled = canExtend;
+    NSString *menuTitle;
     if (deadline) {
         NSString *endTime = [NSDateFormatter localizedStringFromDate:deadline dateStyle:NSDateFormatterNoStyle timeStyle:NSDateFormatterShortStyle];
-        self.statusMenuItem.title = [NSString stringWithFormat:LocalizedString(@"menu.status.timed"), [self countdownForSeconds:MAX(0, deadline.timeIntervalSinceNow)], endTime];
-    } else if (isRunning) {
-        self.statusMenuItem.title = LocalizedString(@"menu.status.indefinite");
+        menuTitle = [NSString stringWithFormat:LocalizedString(@"menu.status.timed"), statusText, endTime];
+    } else {
+        menuTitle = LocalizedString(isRunning ? @"menu.status.indefinite" : @"menu.status.off");
     }
-    button.alphaValue = 1.0;
-    button.toolTip = isRunning ? LocalizedString(@"tooltip.on") : LocalizedString(@"tooltip.off");
-    if (deadline) button.toolTip = self.statusMenuItem.title;
-    button.accessibilityLabel = self.statusMenuItem.title;
-    button.needsDisplay = YES;
+    if (![self.statusMenuItem.title isEqualToString:menuTitle]) self.statusMenuItem.title = menuTitle;
+    if (self.statusMenuItem.state != NSControlStateValueOff) self.statusMenuItem.state = NSControlStateValueOff;
+    NSString *toolTip = deadline ? menuTitle : LocalizedString(isRunning ? @"tooltip.on" : @"tooltip.off");
+    if (button.alphaValue != 1.0) button.alphaValue = 1.0;
+    if (![button.toolTip isEqualToString:toolTip]) button.toolTip = toolTip;
+    if (![button.accessibilityLabel isEqualToString:menuTitle]) button.accessibilityLabel = menuTitle;
+    // AppKit invalidates the button when its image or title changes.
 }
 
 - (void)scheduleStatusVerification {

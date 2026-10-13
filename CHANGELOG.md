@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Cache menu bar symbols and update the status display only when its content changes, while keeping five-second session checks.
+
 ## 1.1.2
 
 - Add Check for Updates to About, with release notes, a download-page link, and manual upgrade instructions.

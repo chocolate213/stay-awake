@@ -3,6 +3,38 @@
 #import "../StayAwakeMenu/main.m"
 #undef main
 
+// Observe writes to the status button without relying on AppKit's redraw coalescing.
+@interface StatusButtonProbe : NSObject
+@property(nonatomic, strong) NSImage *image;
+@property(nonatomic, copy) NSString *title;
+@property(nonatomic, copy) NSString *toolTip;
+@property(nonatomic, copy) NSString *accessibilityLabel;
+@property(nonatomic) CGFloat alphaValue;
+@property(nonatomic) NSUInteger imageWrites;
+@property(nonatomic) NSUInteger titleWrites;
+@property(nonatomic) NSUInteger tooltipWrites;
+@property(nonatomic) NSUInteger accessibilityWrites;
+@property(nonatomic) NSUInteger displayRequests;
+@end
+@implementation StatusButtonProbe
+- (void)setImage:(NSImage *)image { _image = image; self.imageWrites++; }
+- (void)setTitle:(NSString *)title { _title = [title copy]; self.titleWrites++; }
+- (void)setToolTip:(NSString *)toolTip { _toolTip = [toolTip copy]; self.tooltipWrites++; }
+- (void)setAccessibilityLabel:(NSString *)label { _accessibilityLabel = [label copy]; self.accessibilityWrites++; }
+- (void)setNeedsDisplay:(BOOL)needed { if (needed) self.displayRequests++; }
+@end
+@interface StatusItemProbe : NSObject
+@property(nonatomic, strong) StatusButtonProbe *button;
+@end
+@implementation StatusItemProbe
+@end
+@interface PresentationTestApp : StayAwakeApp
+@property(nonatomic, strong) NSDate *testDeadline;
+@end
+@implementation PresentationTestApp
+- (NSDate *)activeDeadline { return self.testDeadline; }
+@end
+
 // Exercise the real async update path without depending on GitHub availability.
 static BOOL HoldUpdateResponse;
 static NSInteger UpdateHTTPStatus = 200;
@@ -91,6 +123,44 @@ int main(int argc, const char *argv[]) {
         app.testRoot = [NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:NSUUID.UUID.UUIDString] isDirectory:YES];
         app.helperSource = [NSURL fileURLWithPath:@(argv[1])];
         @try {
+            PresentationTestApp *presentation = [PresentationTestApp new];
+            StatusItemProbe *item = [StatusItemProbe new];
+            StatusButtonProbe *button = [StatusButtonProbe new];
+            item.button = button;
+            presentation.statusItem = (NSStatusItem *)item;
+            presentation.statusMenuItem = [NSMenuItem new];
+            presentation.toggleMenuItem = [NSMenuItem new];
+            presentation.extendMenuItem = [NSMenuItem new];
+            NSImage *offImage = [presentation statusBarImageForRunning:NO];
+            NSImage *onImage = [presentation statusBarImageForRunning:YES];
+            Check(offImage && onImage && offImage != onImage && offImage.template && onImage.template,
+                @"distinct On/Off template images");
+            Check([presentation statusBarImageForRunning:NO] == offImage &&
+                [presentation statusBarImageForRunning:YES] == onImage, @"reuse configured status symbols");
+            [presentation applyStatusPresentationForRunning:NO];
+            for (NSUInteger index = 0; index < 12; index++) [presentation applyStatusPresentationForRunning:NO];
+            Check(button.imageWrites == 1 && button.titleWrites == 1 && button.tooltipWrites == 1 &&
+                button.accessibilityWrites == 1, @"unchanged Off display is not reassigned on polling");
+            [presentation applyStatusPresentationForRunning:YES];
+            [presentation applyStatusPresentationForRunning:YES];
+            Check(button.image == onImage && button.imageWrites == 2 && button.titleWrites == 2,
+                @"state transition switches image and title once");
+            presentation.testDeadline = [NSDate dateWithTimeIntervalSinceNow:128];
+            [presentation applyStatusPresentationForRunning:YES];
+            for (NSUInteger index = 0; index < 12; index++) [presentation applyStatusPresentationForRunning:YES];
+            Check(button.imageWrites == 2 && button.titleWrites == 3 && presentation.extendMenuItem.enabled,
+                @"unchanged countdown keeps its icon and title while enabling extension");
+            presentation.testDeadline = [NSDate dateWithTimeIntervalSinceNow:58];
+            [presentation applyStatusPresentationForRunning:YES];
+            Check(button.imageWrites == 2 && button.titleWrites == 4 &&
+                [button.title containsString:LocalizedString(@"countdown.lessThanMinute")], @"countdown change updates text without replacing icon");
+            Check([button.accessibilityLabel isEqualToString:presentation.statusMenuItem.title] &&
+                [button.toolTip isEqualToString:presentation.statusMenuItem.title], @"accessibility and tooltip track countdown");
+            presentation.testDeadline = nil;
+            [presentation applyStatusPresentationForRunning:NO];
+            Check(button.image == offImage && button.imageWrites == 3 && !presentation.extendMenuItem.enabled,
+                @"stop restores cached Off symbol and disables extension");
+            Check(button.displayRequests == 0, @"no forced status button redraws");
             [app presentStayAwakeAboutPanel:nil];
             NSWindow *about = app.aboutWindow;
             [app presentStayAwakeAboutPanel:nil];
